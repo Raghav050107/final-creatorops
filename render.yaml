@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: unseenhours-creatorops
+    env: node
+    plan: free
+    region: singapore
+    buildCommand: pnpm install && pnpm build
+    startCommand: node --import tsx/esm server/src/index.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
