@@ -7,7 +7,8 @@ import {
   TrendingUp, 
   Sparkles,
   ChevronRight,
-  Calculator
+  Calculator,
+  X
 } from 'lucide-react';
 
 export type NavTab = 'dashboard' | 'deals' | 'calendar' | 'calculator' | 'creators' | 'revenue';
@@ -19,14 +20,19 @@ interface SidebarProps {
   overdueCount: number;
   openAddCreatorModal: () => void;
   openAddDealModal: () => void;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
+  agencyName,
   overdueCount,
   openAddCreatorModal,
-  openAddDealModal
+  openAddDealModal,
+  isOpenMobile,
+  onCloseMobile
 }) => {
   const navItems = [
     { id: 'dashboard' as NavTab, label: 'Dashboard', icon: LayoutDashboard, badge: overdueCount > 0 ? overdueCount : null, badgeColor: 'bg-warn text-white' },
@@ -37,23 +43,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'revenue' as NavTab, label: 'Revenue Analytics', icon: TrendingUp },
   ];
 
-  return (
-    <aside className="w-64 bg-surface border-r border-border flex flex-col h-screen sticky top-0 z-30 select-none">
+  const content = (
+    <aside className="w-64 bg-surface border-r border-border flex flex-col h-full select-none">
       <div className="p-5 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-white font-bold shadow-subtle">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-ink text-sm leading-snug tracking-tight">Unseen Hours</h1>
-            <p className="text-[11px] text-accent font-semibold truncate max-w-[140px]">Talent Operations</p>
+            <h1 className="font-bold text-ink text-sm leading-snug tracking-tight truncate max-w-[130px]">{agencyName || 'Unseen Hours'}</h1>
+            <p className="text-[11px] text-accent font-semibold truncate max-w-[130px]">Talent Operations</p>
           </div>
         </div>
+        {onCloseMobile && (
+          <button onClick={onCloseMobile} className="md:hidden p-1 text-slate-400 hover:text-ink">
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       <div className="px-3 py-4 flex flex-col gap-2 border-b border-border bg-bg/50">
         <button
-          onClick={openAddDealModal}
+          onClick={() => {
+            openAddDealModal();
+            if (onCloseMobile) onCloseMobile();
+          }}
           className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded-md shadow-subtle flex items-center justify-between transition-colors"
         >
           <span>+ New Brand Deal</span>
@@ -61,7 +75,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
 
         <button
-          onClick={openAddCreatorModal}
+          onClick={() => {
+            openAddCreatorModal();
+            if (onCloseMobile) onCloseMobile();
+          }}
           className="w-full py-1.5 px-3 bg-white hover:bg-slate-50 text-ink text-xs font-medium border border-border rounded-md shadow-subtle flex items-center justify-between transition-colors text-left"
         >
           <span>+ Add Creator</span>
@@ -79,7 +96,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                if (onCloseMobile) onCloseMobile();
+              }}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
                 isActive
                   ? 'bg-accent-light text-accent font-semibold shadow-subtle'
@@ -115,5 +135,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop Fixed Sidebar */}
+      <div className="hidden md:block h-screen sticky top-0 z-30">
+        {content}
+      </div>
+
+      {/* Mobile Drawer Overlay */}
+      {isOpenMobile && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onCloseMobile} />
+          <div className="relative z-10 h-full">
+            {content}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

@@ -29,6 +29,9 @@ export const App: React.FC = () => {
   const [activeManager, setActiveManager] = useState<Manager>(agency.managers[0]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Mobile Drawer State
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   // Modal States
   const [isAddCreatorModalOpen, setIsAddCreatorModalOpen] = useState(false);
   const [isAddDealModalOpen, setIsAddDealModalOpen] = useState(false);
@@ -420,6 +423,8 @@ export const App: React.FC = () => {
         overdueCount={overdueCount}
         openAddCreatorModal={() => setIsAddCreatorModalOpen(true)}
         openAddDealModal={() => setIsAddDealModalOpen(true)}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -431,12 +436,13 @@ export const App: React.FC = () => {
           openEmailDigestModal={() => setIsEmailDigestModalOpen(true)}
           openAuthModal={() => setIsAuthModalOpen(true)}
           openAccountSettingsModal={() => setIsAccountSettingsModalOpen(true)}
+          openMobileSidebar={() => setIsMobileSidebarOpen(true)}
           overdueCount={overdueCount}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {activeTab === 'dashboard' && (
             <DashboardWidgets
               agency={agency}
