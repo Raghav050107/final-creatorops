@@ -1,6 +1,6 @@
 import type { Agency } from '../types/creatorops';
 
-const STORAGE_KEY = 'creatorops_agency_data_permanent_v1';
+const STORAGE_KEY = 'creatorops_agency_data_permanent_v2';
 
 export const INITIAL_AGENCY: Agency = {
   id: 'agency_unseen_hours_1',
@@ -10,9 +10,9 @@ export const INITIAL_AGENCY: Agency = {
       id: 'mgr_jordan',
       agencyId: 'agency_unseen_hours_1',
       name: 'Jordan Miller',
-      email: 'jordan@unseenhours.com',
+      email: 'admin@unseenhours.com',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-      role: 'Senior Talent Director'
+      role: 'Agency Owner / Talent Director'
     },
     {
       id: 'mgr_sam',
@@ -89,23 +89,9 @@ export const INITIAL_AGENCY: Agency = {
       paymentDueDate: '2026-08-10',
       paymentStatus: 'Invoice Sent',
       creatorIds: ['c_markaroni', 'c_divyanshcr7'],
-      notesList: [
-        {
-          id: 'n_101_1',
-          date: 'Jul 22, 2026, 11:30 AM',
-          author: 'Jordan Miller',
-          text: 'Campaign contract signed across Markaroni & DivyanshCR7. Brand brief & custom promo code UNSEEN15 delivered to creators.'
-        },
-        {
-          id: 'n_101_2',
-          date: 'Jul 24, 2026, 04:15 PM',
-          author: 'Sam Chen',
-          text: 'Draft video received from Markaroni. Audio call integration approved by NordVPN brand lead.'
-        }
-      ],
+      notesList: [],
       activityLog: [
-        { id: 'act_1', date: '2026-07-20', author: 'Jordan Miller', text: 'Campaign contract signed across Markaroni & DivyanshCR7.' },
-        { id: 'act_2', date: '2026-07-22', author: 'Sam Chen', text: 'Custom discount links and brief delivered to creators.' }
+        { id: 'act_1', date: '2026-07-20', author: 'Jordan Miller', text: 'Campaign contract signed across Markaroni & DivyanshCR7.' }
       ],
       createdAt: '2026-07-15T10:00:00Z'
     },
@@ -124,14 +110,7 @@ export const INITIAL_AGENCY: Agency = {
       paymentDueDate: '2026-08-15',
       paymentStatus: 'Invoice Pending',
       creatorIds: ['c_onemufc', 'c_divyanshcr7'],
-      notesList: [
-        {
-          id: 'n_102_1',
-          date: 'Jul 24, 2026, 02:00 PM',
-          author: 'Jordan Miller',
-          text: 'Launch campaign locked for FC25 Ultimate Team gameplay integrations. High priority release scheduled for launch weekend.'
-        }
-      ],
+      notesList: [],
       activityLog: [
         { id: 'act_3', date: '2026-07-24', author: 'Jordan Miller', text: 'Launch campaign locked for FC25 Ultimate Team gameplay integrations.' }
       ],
@@ -152,109 +131,15 @@ export const INITIAL_AGENCY: Agency = {
       paymentDueDate: '2026-07-30',
       paymentStatus: 'Payment Processing',
       creatorIds: ['c_markaroni'],
-      notesList: [
-        {
-          id: 'n_103_1',
-          date: 'Jul 16, 2026, 09:45 AM',
-          author: 'Sam Chen',
-          text: 'YouTube integration went live on schedule. Invoice sent to Raycast finance team.'
-        }
-      ],
+      notesList: [],
       activityLog: [
         { id: 'act_4', date: '2026-07-16', author: 'Sam Chen', text: 'Deliverable completed and metrics syncing enabled.' }
       ],
       createdAt: '2026-07-01T15:45:00Z'
     }
   ],
-  deliverables: [
-    {
-      id: 'deliv_1',
-      dealId: 'deal_101',
-      creatorId: 'c_markaroni',
-      category: 'sponsored',
-      title: 'NordVPN Ultimate Security Setup & Speed Test',
-      type: 'video',
-      platform: 'YouTube',
-      dueDate: '2026-07-25',
-      targetLiveDate: '2026-07-28',
-      status: 'Submitted',
-      liveUrl: 'https://youtube.com/watch?v=mockNord1',
-      finalMetrics: {
-        views: 124500,
-        likes: 8900,
-        comments: 640,
-        source: 'manual'
-      },
-      createdAt: '2026-07-16T12:00:00Z'
-    },
-    {
-      id: 'deliv_2',
-      dealId: 'deal_101',
-      creatorId: 'c_divyanshcr7',
-      category: 'sponsored',
-      title: 'How I Protect My Gaming Ping - NordVPN 60s Integration',
-      type: 'short',
-      platform: 'YouTube',
-      dueDate: '2026-07-26',
-      targetLiveDate: '2026-07-28',
-      status: 'Approved',
-      liveUrl: 'https://youtube.com/shorts/mockNord2',
-      finalMetrics: {
-        views: 85200,
-        likes: 6200,
-        comments: 310,
-        source: 'manual'
-      },
-      createdAt: '2026-07-17T14:00:00Z'
-    },
-    {
-      id: 'deliv_3',
-      dealId: 'deal_102',
-      creatorId: 'c_onemufc',
-      category: 'sponsored',
-      title: 'EA Sports FC 25 Career Mode First Look & Gameplay',
-      type: 'video',
-      platform: 'YouTube',
-      dueDate: '2026-07-31',
-      targetLiveDate: '2026-08-02',
-      status: 'Draft',
-      finalMetrics: {
-        views: 0,
-        likes: 0,
-        comments: 0,
-        source: 'manual'
-      },
-      createdAt: '2026-07-23T10:00:00Z'
-    },
-    {
-      id: 'deliv_4',
-      dealId: 'deal_103',
-      creatorId: 'c_markaroni',
-      category: 'sponsored',
-      title: 'Raycast Pro Mac Productivity Workflow',
-      type: 'video',
-      platform: 'YouTube',
-      dueDate: '2026-07-14',
-      targetLiveDate: '2026-07-15',
-      status: 'Live',
-      liveUrl: 'https://youtube.com/watch?v=mockRaycast',
-      finalMetrics: {
-        views: 94000,
-        likes: 7100,
-        comments: 520,
-        source: 'manual'
-      },
-      createdAt: '2026-07-02T16:00:00Z'
-    }
-  ],
-  reports: [
-    {
-      id: 'rep_1',
-      publicSlug: 'nordvpn-q3-campaign-8812',
-      dealId: 'deal_101',
-      generatedAt: '2026-07-29T10:00:00Z'
-    }
-  ]
+  deliverables: [],
+  reports: []
 };
 
 export const loadAgencyData = (): Agency => {
@@ -264,24 +149,13 @@ export const loadAgencyData = (): Agency => {
     const data = JSON.parse(raw) as Agency;
     if (!data || !data.creators || !data.deals) return INITIAL_AGENCY;
 
-    // Preserve agency name as Unseen Hours
-    data.name = 'Unseen Hours';
+    // Ensure deliverables array exists (even if empty)
+    if (!data.deliverables) data.deliverables = [];
 
-    // Auto-migrate deal notes into notesList if present
+    // Ensure notesList array exists for each deal
     if (data.deals && Array.isArray(data.deals)) {
       data.deals = data.deals.map((d: any) => {
         if (!d.notesList) d.notesList = [];
-        if (d.notes && d.notes.trim() !== '') {
-          const alreadyPresent = d.notesList.some((n: any) => n.text.trim() === d.notes.trim());
-          if (!alreadyPresent) {
-            d.notesList.unshift({
-              id: `legacy_${d.id}`,
-              date: 'Previous Note',
-              author: 'Agency Manager',
-              text: d.notes
-            });
-          }
-        }
         return d;
       });
     }
@@ -299,4 +173,14 @@ export const saveAgencyData = (data: Agency): void => {
   } catch (err) {
     console.error('Failed to save agency data:', err);
   }
+};
+
+export const resetWorkspaceData = (): Agency => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_AGENCY));
+  } catch (err) {
+    console.error('Failed to reset workspace data:', err);
+  }
+  return INITIAL_AGENCY;
 };
