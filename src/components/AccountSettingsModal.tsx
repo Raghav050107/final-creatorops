@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { resetWorkspaceData } from '../lib/store';
 import type { Manager } from '../types/creatorops';
 import { 
   User, 
@@ -14,7 +15,8 @@ import {
   Users,
   Edit2,
   Plus,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface AccountSettingsModalProps {
@@ -30,7 +32,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   managers = [],
   onRefreshWorkspace
 }) => {
-  const { user, agency, updateProfile, changePassword } = useAuth();
+  const { user, agency, updateProfile, changePassword, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'team'>('profile');
 
@@ -98,11 +100,12 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError('New password and confirmation do not match');
+      setPasswordError('New passwords do not match');
       return;
     }
 
     setPasswordLoading(true);
+
     try {
       await changePassword({ currentPassword, newPassword });
       setPasswordSuccess(true);
@@ -122,9 +125,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     setTeamError(null);
     setTeamSuccess(null);
     setTeamLoading(true);
+
     try {
       await api.updateAgency({ name: agencyName });
-      setTeamSuccess('Agency name updated successfully!');
+      setTeamSuccess('Agency name updated successfully');
       if (onRefreshWorkspace) onRefreshWorkspace();
       setTimeout(() => setTeamSuccess(null), 3000);
     } catch (err: any) {
@@ -140,14 +144,15 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     setTeamError(null);
     setTeamSuccess(null);
     setTeamLoading(true);
+
     try {
       await api.updateManager(editingManager.id, {
         name: editManagerName,
         email: editManagerEmail,
         role: editManagerRole
       });
-      setTeamSuccess(`Manager ${editManagerName} updated!`);
       setEditingManager(null);
+      setTeamSuccess('Manager updated successfully');
       if (onRefreshWorkspace) onRefreshWorkspace();
       setTimeout(() => setTeamSuccess(null), 3000);
     } catch (err: any) {
@@ -162,6 +167,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     setTeamError(null);
     setTeamSuccess(null);
     setTeamLoading(true);
+
     try {
       await api.addManager({
         name: newMgrName,
@@ -169,25 +175,25 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
         password: newMgrPassword,
         role: newMgrRole
       });
-      setTeamSuccess(`New manager ${newMgrName} added successfully!`);
       setIsAddingManager(false);
       setNewMgrName('');
       setNewMgrEmail('');
       setNewMgrPassword('');
+      setTeamSuccess('New manager seat created!');
       if (onRefreshWorkspace) onRefreshWorkspace();
       setTimeout(() => setTeamSuccess(null), 3000);
     } catch (err: any) {
-      setTeamError(err.message || 'Failed to add manager');
+      setTeamError(err.message || 'Failed to create manager seat');
     } finally {
       setTeamLoading(false);
     }
   };
 
   const handleDeleteManager = async (managerId: string, managerName: string) => {
-    if (!window.confirm(`Are you sure you want to remove ${managerName}?`)) return;
+    if (!confirm(`Remove manager ${managerName} from agency?`)) return;
     setTeamError(null);
     setTeamSuccess(null);
-    setTeamLoading(true);
+
     try {
       await api.deleteManager(managerId);
       setTeamSuccess(`Manager ${managerName} removed.`);
@@ -195,62 +201,68 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       setTimeout(() => setTeamSuccess(null), 3000);
     } catch (err: any) {
       setTeamError(err.message || 'Failed to delete manager');
-    } finally {
-      setTeamLoading(false);
+    }
+  };
+
+  const handleDeleteAgencyWorkspace = () => {
+    if (confirm(`Are you sure you want to permanently DELETE agency "${agency?.name || 'Unseen Hours'}"?\n\nThis will permanently wipe all creators, rate cards, deals, deliverables, and team managers.`)) {
+      resetWorkspaceData();
+      localStorage.clear();
+      logout();
+      window.location.reload();
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-surface rounded-2xl max-w-lg w-full shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in duration-150">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-surface rounded-2xl border border-border shadow-modal max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
-        <div className="p-5 border-b border-border bg-slate-900 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-accent text-white rounded-xl shadow-md">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
+        <div className="p-4 border-b border-border flex items-center justify-between bg-slate-900 text-white">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-accent" />
             <div>
-              <h3 className="text-base font-extrabold text-white">
-                Account & Workspace Settings
-              </h3>
-              <p className="text-[11px] text-slate-300">
-                Manage credentials, passwords & manager seats
-              </p>
+              <h3 className="text-sm font-bold text-white">Account & Workspace Settings</h3>
+              <p className="text-[10px] text-slate-300">{agency?.name || 'Unseen Hours'}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-3 p-1.5 bg-bg border-b border-border">
+        <div className="flex border-b border-border bg-slate-50 px-4 pt-2 gap-1 text-xs">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'profile' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
+            className={`px-3 py-2 font-bold rounded-t-lg transition-colors flex items-center gap-1.5 border-b-2 ${
+              activeTab === 'profile'
+                ? 'bg-white text-accent border-accent shadow-subtle'
+                : 'text-ink-muted border-transparent hover:text-ink'
             }`}
           >
             <User className="w-3.5 h-3.5" />
             <span>My Profile</span>
           </button>
+
           <button
             onClick={() => setActiveTab('password')}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'password' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
+            className={`px-3 py-2 font-bold rounded-t-lg transition-colors flex items-center gap-1.5 border-b-2 ${
+              activeTab === 'password'
+                ? 'bg-white text-accent border-accent shadow-subtle'
+                : 'text-ink-muted border-transparent hover:text-ink'
             }`}
           >
             <KeyRound className="w-3.5 h-3.5" />
-            <span>Password</span>
+            <span>Change Password</span>
           </button>
+
           <button
             onClick={() => setActiveTab('team')}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'team' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
+            className={`px-3 py-2 font-bold rounded-t-lg transition-colors flex items-center gap-1.5 border-b-2 ${
+              activeTab === 'team'
+                ? 'bg-white text-accent border-accent shadow-subtle'
+                : 'text-ink-muted border-transparent hover:text-ink'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
@@ -258,71 +270,71 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Content Area */}
-        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto flex-1">
           
-          {/* TAB 1: PROFILE & EMAIL */}
+          {/* TAB 1: PROFILE */}
           {activeTab === 'profile' && (
-            <form onSubmit={handleUpdateProfile} className="space-y-3.5">
-              {profileError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                  {profileError}
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              {profileSuccess && (
+                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>Profile details updated successfully!</span>
                 </div>
               )}
-              {profileSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-1.5">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Profile credentials updated successfully!</span>
+
+              {profileError && (
+                <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg text-xs font-bold">
+                  {profileError}
                 </div>
               )}
 
               <div>
-                <label className="block text-[11px] font-bold text-ink uppercase mb-1">
-                  Your Full Name
-                </label>
+                <label className="block text-xs font-bold text-ink mb-1">Full Name</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
+                    className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-ink uppercase mb-1">
-                  Email Address (Login Username)
-                </label>
+                <label className="block text-xs font-bold text-ink mb-1">Email Address</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
+                    className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent font-bold"
                   />
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-3.5 py-2 text-xs font-bold text-ink-muted hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="p-3 bg-slate-50 border border-border rounded-xl flex items-center justify-between text-xs">
+                <div>
+                  <p className="font-bold text-ink">Role & Permissions</p>
+                  <p className="text-[10px] text-slate-500 capitalize">{user?.role || 'owner'}</p>
+                </div>
+                <span className="px-2.5 py-1 bg-accent/10 text-accent font-extrabold text-[10px] rounded-full uppercase">
+                  {user?.role || 'Owner'}
+                </span>
+              </div>
+
+              <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
                   disabled={profileLoading}
-                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-lg shadow-subtle flex items-center gap-1.5 transition-all"
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-lg shadow-subtle transition-colors flex items-center gap-1.5"
                 >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>{profileLoading ? 'Saving...' : 'Save Profile Changes'}</span>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Save Profile</span>
                 </button>
               </div>
             </form>
@@ -330,153 +342,140 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
           {/* TAB 2: CHANGE PASSWORD */}
           {activeTab === 'password' && (
-            <form onSubmit={handleChangePassword} className="space-y-3.5">
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              {passwordSuccess && (
+                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>Password updated successfully!</span>
+                </div>
+              )}
+
               {passwordError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+                <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg text-xs font-bold">
                   {passwordError}
                 </div>
               )}
-              {passwordSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-1.5">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Password changed successfully!</span>
-                </div>
-              )}
 
               <div>
-                <label className="block text-[11px] font-bold text-ink uppercase mb-1">
-                  Current Password
-                </label>
+                <label className="block text-xs font-bold text-ink mb-1">Current Password</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="password"
                     required
-                    placeholder="Enter current password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
                     className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-ink uppercase mb-1">
-                  New Password
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    placeholder="At least 6 characters"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
-                  />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-ink mb-1">New Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="password"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Min 6 chars"
+                      className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-ink mb-1">Confirm New Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-ink uppercase mb-1">
-                  Confirm New Password
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    placeholder="Re-enter new password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-3.5 py-2 text-xs font-bold text-ink-muted hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
                   disabled={passwordLoading}
-                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-lg shadow-subtle flex items-center gap-1.5 transition-all"
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-lg shadow-subtle transition-colors"
                 >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>{passwordLoading ? 'Updating...' : 'Update Password'}</span>
+                  Update Password
                 </button>
               </div>
             </form>
           )}
 
-          {/* TAB 3: MANAGERS & AGENCY NAME */}
+          {/* TAB 3: MANAGERS & AGENCY */}
           {activeTab === 'team' && (
-            <div className="space-y-4">
-              {teamError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                  {teamError}
-                </div>
-              )}
+            <div className="space-y-6">
               {teamSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-1.5">
+                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-600" />
                   <span>{teamSuccess}</span>
                 </div>
               )}
 
-              {/* Agency Name Update Section */}
-              <form onSubmit={handleUpdateAgencyName} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <label className="block text-[11px] font-bold text-ink uppercase">
-                  Agency Workspace Name
-                </label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={agencyName}
-                      onChange={(e) => setAgencyName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 bg-white text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
-                    />
-                  </div>
+              {teamError && (
+                <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg text-xs font-bold">
+                  {teamError}
+                </div>
+              )}
+
+              {/* AGENCY NAME EDIT FORM */}
+              <form onSubmit={handleUpdateAgencyName} className="p-4 bg-slate-50 rounded-xl border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-ink">Agency Workspace Name</label>
                   <button
                     type="submit"
                     disabled={teamLoading}
-                    className="px-3 py-1.5 bg-accent text-white text-xs font-bold rounded-lg hover:bg-accent-hover transition-colors"
+                    className="px-3 py-1 bg-accent text-white text-xs font-bold rounded-lg shadow-subtle"
                   >
-                    Save Name
+                    Update Name
                   </button>
                 </div>
+                <input
+                  type="text"
+                  required
+                  value={agencyName}
+                  onChange={(e) => setAgencyName(e.target.value)}
+                  className="w-full px-3 py-2 bg-white text-ink text-xs font-bold rounded-lg border border-border focus:outline-none focus:border-accent"
+                />
               </form>
 
-              {/* Team Manager List & Editing */}
-              <div className="space-y-2">
+              {/* MANAGERS SECTION */}
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-ink uppercase tracking-wider">
-                    Team Managers ({managers.length})
-                  </p>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-ink">Team Managers ({managers.length})</h4>
+                    <p className="text-[10px] text-slate-500">Manage seats, roles, and access credentials.</p>
+                  </div>
                   <button
+                    type="button"
                     onClick={() => {
-                      setIsAddingManager(true);
+                      setIsAddingManager(!isAddingManager);
                       setEditingManager(null);
                     }}
-                    className="flex items-center gap-1 text-xs font-bold text-accent hover:underline"
+                    className="py-1 px-2.5 bg-slate-900 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-slate-800"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Add New Manager</span>
+                    <span>Add Manager</span>
                   </button>
                 </div>
 
-                {/* ADD NEW MANAGER FORM */}
+                {/* ADD MANAGER FORM */}
                 {isAddingManager && (
-                  <form onSubmit={handleAddNewManager} className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl space-y-2.5">
-                    <p className="text-xs font-bold text-slate-900">Add New Manager Seat</p>
+                  <form onSubmit={handleAddNewManager} className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-3">
+                    <h5 className="text-xs font-bold text-indigo-950">Add New Manager Seat</h5>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <input
                         type="text"
@@ -489,7 +488,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       <input
                         type="email"
                         required
-                        placeholder="Work Email"
+                        placeholder="Email Address"
                         value={newMgrEmail}
                         onChange={(e) => setNewMgrEmail(e.target.value)}
                         className="px-2.5 py-1.5 bg-white border border-border rounded-lg"
@@ -497,7 +496,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       <input
                         type="password"
                         required
-                        placeholder="Initial Password"
+                        placeholder="Password"
                         value={newMgrPassword}
                         onChange={(e) => setNewMgrPassword(e.target.value)}
                         className="px-2.5 py-1.5 bg-white border border-border rounded-lg"
@@ -523,18 +522,18 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       <button
                         type="submit"
                         disabled={teamLoading}
-                        className="px-3.5 py-1 bg-accent text-white text-xs font-bold rounded"
+                        className="px-3.5 py-1 bg-accent text-white text-xs font-bold rounded shadow-subtle"
                       >
-                        Add Manager
+                        Create Manager Seat
                       </button>
                     </div>
                   </form>
                 )}
 
-                {/* EDITING SPECIFIC MANAGER FORM */}
+                {/* EDIT MANAGER FORM */}
                 {editingManager && (
-                  <form onSubmit={handleSaveEditManager} className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5">
-                    <p className="text-xs font-bold text-amber-900">Editing Manager: {editingManager.name}</p>
+                  <form onSubmit={handleSaveEditManager} className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl space-y-3">
+                    <h5 className="text-xs font-bold text-amber-950">Editing Manager: {editingManager.name}</h5>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <input
                         type="text"
@@ -617,6 +616,25 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* DANGER ZONE: DELETE ENTIRE AGENCY WORKSPACE */}
+                <div className="pt-4 border-t border-red-200 mt-6 space-y-2">
+                  <h4 className="text-xs font-bold text-red-700 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-red-600" />
+                    <span>Danger Zone: Delete Agency Workspace</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Permanently delete this entire agency workspace, including all roster creators, rate cards, sponsorship deals, deliverables, and team manager seats.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAgencyWorkspace}
+                    className="py-2 px-4 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-subtle"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                    <span>Delete Entire Agency Workspace</span>
+                  </button>
                 </div>
               </div>
 
