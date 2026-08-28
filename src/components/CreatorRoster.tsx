@@ -9,7 +9,7 @@ import {
   Shield,
   Globe,
   Video,
-  Instagram,
+  Camera,
   Tag
 } from 'lucide-react';
 import { formatINR } from '../lib/format';
@@ -24,6 +24,14 @@ interface CreatorRosterProps {
   setIsAddModalOpen: (open: boolean) => void;
 }
 
+const PAYMENT_STATUS_COLORS: Record<PaymentStatusType, string> = {
+  'Invoice Pending': 'bg-amber-50 text-amber-800 border-amber-200',
+  'Invoice Sent': 'bg-blue-50 text-blue-800 border-blue-200',
+  'Payment Processing': 'bg-purple-50 text-purple-800 border-purple-200',
+  'Paid & Completed': 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  'Overdue': 'bg-red-50 text-red-800 border-red-200'
+};
+
 export const CreatorRoster: React.FC<CreatorRosterProps> = ({
   agency,
   onDeleteCreator,
@@ -32,7 +40,7 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
 }) => {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [representationFilter, setRepresentationFilter] = useState<'all' | CreatorRepresentationType>('all');
-  const [printingCreator, setPrintingCreator] = useState<Creator | null>(null);
+  const [, setPrintingCreator] = useState<Creator | null>(null);
 
   const filteredCreators = agency.creators.filter(c => {
     if (representationFilter !== 'all' && c.representationType !== representationFilter) return false;
@@ -235,7 +243,7 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
                   {/* 1 Insta Reel Rate Pill */}
                   <div className="p-2.5 bg-white border border-indigo-200/80 rounded-lg flex items-center gap-2.5 shadow-subtle">
                     <div className="p-1.5 bg-pink-50 text-pink-600 rounded-md">
-                      <Instagram className="w-4 h-4" />
+                      <Camera className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-500 uppercase">1 Instagram Reel Rate</p>
