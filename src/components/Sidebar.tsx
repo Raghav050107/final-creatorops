@@ -5,14 +5,12 @@ import {
   CalendarDays, 
   Users, 
   TrendingUp, 
-  FileText, 
   Sparkles,
   ChevronRight,
-  Video,
   Calculator
 } from 'lucide-react';
 
-export type NavTab = 'dashboard' | 'deals' | 'calendar' | 'analytics' | 'calculator' | 'creators' | 'revenue' | 'reports';
+export type NavTab = 'dashboard' | 'deals' | 'calendar' | 'calculator' | 'creators' | 'revenue';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -34,11 +32,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard' as NavTab, label: 'Dashboard', icon: LayoutDashboard, badge: overdueCount > 0 ? overdueCount : null, badgeColor: 'bg-warn text-white' },
     { id: 'deals' as NavTab, label: 'Deals Kanban', icon: Kanban },
     { id: 'calendar' as NavTab, label: 'Unified Calendar', icon: CalendarDays, highlight: true },
-    { id: 'analytics' as NavTab, label: 'Channel Analytics', icon: Video, badge: 'Real API' },
     { id: 'calculator' as NavTab, label: 'Proposal Calculator', icon: Calculator, badge: 'Tool' },
     { id: 'creators' as NavTab, label: 'Creator Roster', icon: Users },
     { id: 'revenue' as NavTab, label: 'Revenue Analytics', icon: TrendingUp },
-    { id: 'reports' as NavTab, label: 'Brand Reports', icon: FileText },
   ];
 
   return (

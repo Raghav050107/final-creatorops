@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Agency, Creator, Deal, Deliverable, DealStage, DeliverableStatus, Manager, Report } from './types/creatorops';
+import type { Agency, Creator, Deal, Deliverable, DealStage, DeliverableStatus, Manager } from './types/creatorops';
 import { loadAgencyData, saveAgencyData } from './lib/store';
 import { api } from './lib/api';
 import { useAuth } from './context/AuthContext';
@@ -8,17 +8,13 @@ import { Header } from './components/Header';
 import { DashboardWidgets } from './components/DashboardWidgets';
 import { KanbanBoard } from './components/KanbanBoard';
 import { UnifiedCalendar } from './components/UnifiedCalendar';
-import { ChannelAnalytics } from './components/ChannelAnalytics';
 import { ProposalCalculator } from './components/ProposalCalculator';
 import { CreatorRoster } from './components/CreatorRoster';
 import { RevenueDashboard } from './components/RevenueDashboard';
-import { ReportList } from './components/ReportList';
-import { PublicReportView } from './components/PublicReportView';
 import { 
   AddCreatorModal, 
   AddDealModal, 
   AddDeliverableModal, 
-  YouTubeApiKeyModal, 
   EmailDigestModal 
 } from './components/Modals';
 import { CreatorInvoiceModal } from './components/CreatorInvoiceModal';
@@ -32,13 +28,11 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<any>('deals');
   const [activeManager, setActiveManager] = useState<Manager>(agency.managers[0]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [youtubeApiKey, setYoutubeApiKey] = useState<string>(() => localStorage.getItem('youtube_api_key') || '');
 
   // Modal States
   const [isAddCreatorModalOpen, setIsAddCreatorModalOpen] = useState(false);
   const [isAddDealModalOpen, setIsAddDealModalOpen] = useState(false);
   const [isAddDeliverableModalOpen, setIsAddDeliverableModalOpen] = useState(false);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isEmailDigestModalOpen, setIsEmailDigestModalOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -49,9 +43,6 @@ export const App: React.FC = () => {
   // Modal Presets
   const [presetDealIdForDeliverable, setPresetDealIdForDeliverable] = useState<string | undefined>();
   const [presetTargetLiveDate, setPresetTargetLiveDate] = useState<string | undefined>();
-
-  // Public Report State
-  const [activePublicReport, setActivePublicReport] = useState<{ report: Report; deal: Deal } | null>(null);
 
   // Sync with Backend on mount or when authAgency changes
   const fetchLiveWorkspace = async () => {
@@ -86,11 +77,6 @@ export const App: React.FC = () => {
   });
 
   const overdueCount = overdueDeliverables.length;
-
-  const handleSaveApiKey = (key: string) => {
-    setYoutubeApiKey(key);
-    localStorage.setItem('youtube_api_key', key);
-  };
 
   const handleSaveCreator = async (newCreatorData: Omit<Creator, 'id' | 'createdAt'>) => {
     const tempId = `c_${Date.now()}`;
@@ -411,54 +397,14 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleGenerateReport = async (dealId: string) => {
-    const deal = agency.deals.find(d => d.id === dealId);
-    if (!deal) return;
-    const slug = `${deal.brandName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString().slice(-4)}`;
-    const report: Report = {
-      id: `rep_${Date.now()}`,
-      agencyId: agency.id,
-      publicSlug: slug,
-      dealId,
-      generatedAt: new Date().toISOString()
-    };
-
-    setAgency(prev => ({
-      ...prev,
-      reports: [report, ...prev.reports]
-    }));
-
-    try {
-      await api.createReport(dealId);
-    } catch (err) {
-      console.warn('Backend sync failed, saved locally:', err);
-    }
-
-    setActivePublicReport({ report, deal });
-  };
-
-  if (activePublicReport) {
-    return (
-      <PublicReportView
-        deal={activePublicReport.deal}
-        creators={agency.creators}
-        deliverables={agency.deliverables}
-        report={activePublicReport.report}
-        onBackToApp={() => setActivePublicReport(null)}
-      />
-    );
-  }
-
   const getTabTitle = (): string => {
     switch (activeTab) {
       case 'dashboard': return 'Agency Executive Dashboard';
       case 'deals': return 'Brand Deals Kanban Pipeline';
       case 'calendar': return 'Unified Roster & Target Live Calendar';
-      case 'analytics': return 'YouTube Channel Performance Analytics (24h, 7d, 30d)';
       case 'calculator': return 'Creator Rate Card & Package Proposal Calculator';
       case 'creators': return 'Creator Roster Directory';
       case 'revenue': return 'Revenue & Agency Commission Analytics';
-      case 'reports': return 'Public Brand Reports';
       default: return 'CreatorOps';
     }
   };
@@ -556,14 +502,6 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'analytics' && (
-            <ChannelAnalytics
-              creators={agency.creators}
-              youtubeApiKey={youtubeApiKey}
-              onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-            />
-          )}
-
           {activeTab === 'calculator' && (
             <ProposalCalculator
               agency={agency}
@@ -589,17 +527,6 @@ export const App: React.FC = () => {
 
           {activeTab === 'revenue' && (
             <RevenueDashboard agency={agency} />
-          )}
-
-          {activeTab === 'reports' && (
-            <ReportList
-              agency={agency}
-              onGenerateReport={(dealId) => handleGenerateReport(dealId)}
-              onPreviewReport={(report: Report) => {
-                const deal = agency.deals.find(d => d.id === report.dealId);
-                if (deal) setActivePublicReport({ report, deal });
-              }}
-            />
           )}
         </main>
       </div>
@@ -631,13 +558,6 @@ export const App: React.FC = () => {
           setPresetTargetLiveDate(undefined);
         }}
         onSaveDeliverable={handleSaveDeliverable}
-      />
-
-      <YouTubeApiKeyModal
-        apiKey={youtubeApiKey}
-        isOpen={isApiKeyModalOpen}
-        onClose={() => setIsApiKeyModalOpen(false)}
-        onSaveApiKey={handleSaveApiKey}
       />
 
       <EmailDigestModal
