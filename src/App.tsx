@@ -584,6 +584,8 @@ export const App: React.FC = () => {
       <AccountSettingsModal
         isOpen={isAccountSettingsModalOpen}
         onClose={() => setIsAccountSettingsModalOpen(false)}
+        managers={agency.managers}
+        onRefreshWorkspace={fetchLiveWorkspace}
       />
     </div>
   );

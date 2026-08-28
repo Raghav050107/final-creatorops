@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../lib/api';
+import type { Manager } from '../types/creatorops';
 import { 
   User, 
   Mail, 
@@ -8,18 +10,29 @@ import {
   X, 
   ShieldCheck, 
   Building2,
-  KeyRound
+  KeyRound,
+  Users,
+  Edit2,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 interface AccountSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  managers?: Manager[];
+  onRefreshWorkspace?: () => void;
 }
 
-export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onClose }) => {
+export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ 
+  isOpen, 
+  onClose,
+  managers = [],
+  onRefreshWorkspace
+}) => {
   const { user, agency, updateProfile, changePassword } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'team'>('profile');
 
   // Profile Form
   const [name, setName] = useState(user?.name || '');
@@ -36,6 +49,24 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
+  // Agency & Team Form
+  const [agencyName, setAgencyName] = useState(agency?.name || 'Unseen Hours');
+  const [editingManager, setEditingManager] = useState<Manager | null>(null);
+  const [editManagerName, setEditManagerName] = useState('');
+  const [editManagerEmail, setEditManagerEmail] = useState('');
+  const [editManagerRole, setEditManagerRole] = useState('manager');
+
+  // Add New Manager Form
+  const [isAddingManager, setIsAddingManager] = useState(false);
+  const [newMgrName, setNewMgrName] = useState('');
+  const [newMgrEmail, setNewMgrEmail] = useState('');
+  const [newMgrPassword, setNewMgrPassword] = useState('');
+  const [newMgrRole, setNewMgrRole] = useState('manager');
+
+  const [teamSuccess, setTeamSuccess] = useState<string | null>(null);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [teamLoading, setTeamLoading] = useState(false);
+
   if (!isOpen) return null;
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -47,6 +78,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
     try {
       await updateProfile({ name, email });
       setProfileSuccess(true);
+      if (onRefreshWorkspace) onRefreshWorkspace();
       setTimeout(() => setProfileSuccess(false), 3000);
     } catch (err: any) {
       setProfileError(err.message || 'Failed to update profile');
@@ -85,9 +117,92 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
     }
   };
 
+  const handleUpdateAgencyName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTeamError(null);
+    setTeamSuccess(null);
+    setTeamLoading(true);
+    try {
+      await api.updateAgency({ name: agencyName });
+      setTeamSuccess('Agency name updated successfully!');
+      if (onRefreshWorkspace) onRefreshWorkspace();
+      setTimeout(() => setTeamSuccess(null), 3000);
+    } catch (err: any) {
+      setTeamError(err.message || 'Failed to update agency name');
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const handleSaveEditManager = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingManager) return;
+    setTeamError(null);
+    setTeamSuccess(null);
+    setTeamLoading(true);
+    try {
+      await api.updateManager(editingManager.id, {
+        name: editManagerName,
+        email: editManagerEmail,
+        role: editManagerRole
+      });
+      setTeamSuccess(`Manager ${editManagerName} updated!`);
+      setEditingManager(null);
+      if (onRefreshWorkspace) onRefreshWorkspace();
+      setTimeout(() => setTeamSuccess(null), 3000);
+    } catch (err: any) {
+      setTeamError(err.message || 'Failed to update manager');
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const handleAddNewManager = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTeamError(null);
+    setTeamSuccess(null);
+    setTeamLoading(true);
+    try {
+      await api.addManager({
+        name: newMgrName,
+        email: newMgrEmail,
+        password: newMgrPassword,
+        role: newMgrRole
+      });
+      setTeamSuccess(`New manager ${newMgrName} added successfully!`);
+      setIsAddingManager(false);
+      setNewMgrName('');
+      setNewMgrEmail('');
+      setNewMgrPassword('');
+      if (onRefreshWorkspace) onRefreshWorkspace();
+      setTimeout(() => setTeamSuccess(null), 3000);
+    } catch (err: any) {
+      setTeamError(err.message || 'Failed to add manager');
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const handleDeleteManager = async (managerId: string, managerName: string) => {
+    if (!window.confirm(`Are you sure you want to remove ${managerName}?`)) return;
+    setTeamError(null);
+    setTeamSuccess(null);
+    setTeamLoading(true);
+    try {
+      await api.deleteManager(managerId);
+      setTeamSuccess(`Manager ${managerName} removed.`);
+      if (onRefreshWorkspace) onRefreshWorkspace();
+      setTimeout(() => setTeamSuccess(null), 3000);
+    } catch (err: any) {
+      setTeamError(err.message || 'Failed to delete manager');
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-surface rounded-2xl max-w-md w-full shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in duration-150">
+      <div className="bg-surface rounded-2xl max-w-lg w-full shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in duration-150">
         
         {/* Modal Header */}
         <div className="p-5 border-b border-border bg-slate-900 text-white flex items-center justify-between">
@@ -97,10 +212,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
             </div>
             <div>
               <h3 className="text-base font-extrabold text-white">
-                Account & Security Settings
+                Account & Workspace Settings
               </h3>
               <p className="text-[11px] text-slate-300">
-                Manage your credentials & agency profile
+                Manage credentials, passwords & manager seats
               </p>
             </div>
           </div>
@@ -113,7 +228,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
         </div>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-2 p-1.5 bg-bg border-b border-border">
+        <div className="grid grid-cols-3 p-1.5 bg-bg border-b border-border">
           <button
             onClick={() => setActiveTab('profile')}
             className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
@@ -121,7 +236,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
             }`}
           >
             <User className="w-3.5 h-3.5" />
-            <span>Profile & Email</span>
+            <span>My Profile</span>
           </button>
           <button
             onClick={() => setActiveTab('password')}
@@ -130,27 +245,22 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
             }`}
           >
             <KeyRound className="w-3.5 h-3.5" />
-            <span>Change Password</span>
+            <span>Password</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('team')}
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'team' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Managers & Agency</span>
           </button>
         </div>
 
         {/* Content Area */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           
-          {/* Agency Badge Info */}
-          <div className="p-3 bg-indigo-50/70 border border-indigo-200/80 rounded-xl flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-accent" />
-              <div>
-                <p className="font-bold text-slate-900">{agency?.name || 'Unseen Hours'}</p>
-                <p className="text-[10px] text-slate-500">Role: <span className="font-bold text-accent uppercase">{user?.role || 'Owner'}</span></p>
-              </div>
-            </div>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-              Active Session
-            </span>
-          </div>
-
           {/* TAB 1: PROFILE & EMAIL */}
           {activeTab === 'profile' && (
             <form onSubmit={handleUpdateProfile} className="space-y-3.5">
@@ -168,7 +278,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
 
               <div>
                 <label className="block text-[11px] font-bold text-ink uppercase mb-1">
-                  Full Name
+                  Your Full Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -302,6 +412,215 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                 </button>
               </div>
             </form>
+          )}
+
+          {/* TAB 3: MANAGERS & AGENCY NAME */}
+          {activeTab === 'team' && (
+            <div className="space-y-4">
+              {teamError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+                  {teamError}
+                </div>
+              )}
+              {teamSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-1.5">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>{teamSuccess}</span>
+                </div>
+              )}
+
+              {/* Agency Name Update Section */}
+              <form onSubmit={handleUpdateAgencyName} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <label className="block text-[11px] font-bold text-ink uppercase">
+                  Agency Workspace Name
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={agencyName}
+                      onChange={(e) => setAgencyName(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 bg-white text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={teamLoading}
+                    className="px-3 py-1.5 bg-accent text-white text-xs font-bold rounded-lg hover:bg-accent-hover transition-colors"
+                  >
+                    Save Name
+                  </button>
+                </div>
+              </form>
+
+              {/* Team Manager List & Editing */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-ink uppercase tracking-wider">
+                    Team Managers ({managers.length})
+                  </p>
+                  <button
+                    onClick={() => {
+                      setIsAddingManager(true);
+                      setEditingManager(null);
+                    }}
+                    className="flex items-center gap-1 text-xs font-bold text-accent hover:underline"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add New Manager</span>
+                  </button>
+                </div>
+
+                {/* ADD NEW MANAGER FORM */}
+                {isAddingManager && (
+                  <form onSubmit={handleAddNewManager} className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl space-y-2.5">
+                    <p className="text-xs font-bold text-slate-900">Add New Manager Seat</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Manager Name"
+                        value={newMgrName}
+                        onChange={(e) => setNewMgrName(e.target.value)}
+                        className="px-2.5 py-1.5 bg-white border border-border rounded-lg"
+                      />
+                      <input
+                        type="email"
+                        required
+                        placeholder="Work Email"
+                        value={newMgrEmail}
+                        onChange={(e) => setNewMgrEmail(e.target.value)}
+                        className="px-2.5 py-1.5 bg-white border border-border rounded-lg"
+                      />
+                      <input
+                        type="password"
+                        required
+                        placeholder="Initial Password"
+                        value={newMgrPassword}
+                        onChange={(e) => setNewMgrPassword(e.target.value)}
+                        className="px-2.5 py-1.5 bg-white border border-border rounded-lg"
+                      />
+                      <select
+                        value={newMgrRole}
+                        onChange={(e) => setNewMgrRole(e.target.value)}
+                        className="px-2.5 py-1.5 bg-white border border-border rounded-lg font-bold"
+                      >
+                        <option value="manager font-bold">Operations Manager</option>
+                        <option value="owner">Agency Principal / Owner</option>
+                        <option value="viewer">Read-Only Viewer</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingManager(false)}
+                        className="px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={teamLoading}
+                        className="px-3.5 py-1 bg-accent text-white text-xs font-bold rounded"
+                      >
+                        Add Manager
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* EDITING SPECIFIC MANAGER FORM */}
+                {editingManager && (
+                  <form onSubmit={handleSaveEditManager} className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5">
+                    <p className="text-xs font-bold text-amber-900">Editing Manager: {editingManager.name}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <input
+                        type="text"
+                        required
+                        value={editManagerName}
+                        onChange={(e) => setEditManagerName(e.target.value)}
+                        className="px-2.5 py-1.5 bg-white border border-border rounded-lg"
+                      />
+                      <input
+                        type="email"
+                        required
+                        value={editManagerEmail}
+                        onChange={(e) => setEditManagerEmail(e.target.value)}
+                        className="px-2.5 py-1.5 bg-white border border-border rounded-lg"
+                      />
+                      <select
+                        value={editManagerRole}
+                        onChange={(e) => setEditManagerRole(e.target.value)}
+                        className="col-span-2 px-2.5 py-1.5 bg-white border border-border rounded-lg font-bold"
+                      >
+                        <option value="manager">Operations Manager</option>
+                        <option value="owner">Agency Principal / Owner</option>
+                        <option value="viewer">Read-Only Viewer</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditingManager(null)}
+                        className="px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={teamLoading}
+                        className="px-3.5 py-1 bg-accent text-white text-xs font-bold rounded"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* LIST OF MANAGERS */}
+                <div className="divide-y divide-border border border-border rounded-xl bg-white overflow-hidden text-xs">
+                  {managers.map(m => (
+                    <div key={m.id} className="p-3 flex items-center justify-between hover:bg-slate-50">
+                      <div className="flex items-center gap-2.5">
+                        <img src={m.avatarUrl} alt={m.name} className="w-8 h-8 rounded-full border border-border object-cover" />
+                        <div>
+                          <p className="font-bold text-ink">{m.name}</p>
+                          <p className="text-[10px] text-slate-500">{m.email} • <span className="font-bold text-accent">{m.role}</span></p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setEditingManager(m);
+                            setEditManagerName(m.name);
+                            setEditManagerEmail(m.email);
+                            setEditManagerRole(m.role.includes('Owner') ? 'owner' : 'manager');
+                            setIsAddingManager(false);
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-accent hover:bg-slate-100 rounded-md"
+                          title="Edit manager details"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        {user?.id !== m.id && (
+                          <button
+                            onClick={() => handleDeleteManager(m.id, m.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                            title="Delete manager seat"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
           )}
 
         </div>

@@ -93,6 +93,35 @@ class ApiClient {
     });
   }
 
+  // --- Agency & Manager Management ---
+
+  public async updateAgency(data: { name: string }) {
+    return this.request<{ message: string; agency: any }>('/agency', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public async updateManager(managerId: string, data: { name: string; email: string; role?: string }) {
+    return this.request<{ message: string; user: any }>(`/agency/managers/${managerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public async addManager(data: { name: string; email: string; password: string; role: string }) {
+    return this.request<{ message: string; user: any }>('/agency/managers', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public async deleteManager(managerId: string) {
+    return this.request<{ message: string }>(`/agency/managers/${managerId}`, {
+      method: 'DELETE'
+    });
+  }
+
   // --- Workspace Aggregate Endpoint ---
 
   public async getAgencyWorkspace(): Promise<Agency> {
