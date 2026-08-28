@@ -35,12 +35,49 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const OFFLINE_USER_KEY = 'creatorops_offline_user_data';
+const OFFLINE_AGENCY_KEY = 'creatorops_offline_agency_data';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [agency, setAgency] = useState<AuthAgency | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem(OFFLINE_USER_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [agency, setAgency] = useState<AuthAgency | null>(() => {
+    try {
+      const saved = localStorage.getItem(OFFLINE_AGENCY_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [token, setToken] = useState<string | null>(() => api.getToken());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
+
+  const saveOfflineSession = (u: AuthUser, a: AuthAgency) => {
+    try {
+      localStorage.setItem(OFFLINE_USER_KEY, JSON.stringify(u));
+      localStorage.setItem(OFFLINE_AGENCY_KEY, JSON.stringify(a));
+    } catch (e) {
+      console.warn('Could not save offline session:', e);
+    }
+  };
+
+  const clearOfflineSession = () => {
+    try {
+      localStorage.removeItem(OFFLINE_USER_KEY);
+      localStorage.removeItem(OFFLINE_AGENCY_KEY);
+    } catch (e) {
+      console.warn('Could not clear offline session:', e);
+    }
+  };
 
   const checkAuth = async () => {
     setIsLoading(true);
@@ -49,25 +86,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (meData && meData.user && meData.agency) {
         setUser(meData.user);
         setAgency(meData.agency);
+        saveOfflineSession(meData.user, meData.agency);
         setIsBackendConnected(true);
       }
     } catch (err) {
-      console.warn('Could not verify session with backend, checking offline mode:', err);
-      if (!user) {
-        setUser({
+      console.warn('Backend server unavailable, preserving active local user session:', err);
+      // PRESERVE REGISTERED OR LOGGED IN OFFLINE USER ON REFRESH!
+      const savedUserStr = localStorage.getItem(OFFLINE_USER_KEY);
+      const savedAgencyStr = localStorage.getItem(OFFLINE_AGENCY_KEY);
+
+      if (savedUserStr && savedAgencyStr) {
+        try {
+          setUser(JSON.parse(savedUserStr));
+          setAgency(JSON.parse(savedAgencyStr));
+        } catch {
+          // fallback only if parse fails
+        }
+      } else {
+        // Fallback default admin session only on very first launch
+        const defaultUser: AuthUser = {
           id: 'user_admin_1',
           name: 'Jordan Miller',
           email: 'admin@unseenhours.com',
           role: 'owner',
           avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
           agencyId: 'agency_unseen_hours_1'
-        });
-        setAgency({
+        };
+        const defaultAgency: AuthAgency = {
           id: 'agency_unseen_hours_1',
           name: 'Unseen Hours',
           slug: 'unseen-hours',
           currency: 'INR'
-        });
+        };
+        setUser(defaultUser);
+        setAgency(defaultAgency);
+        saveOfflineSession(defaultUser, defaultAgency);
       }
     } finally {
       setIsLoading(false);
@@ -85,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(res.user);
       setAgency(res.agency);
       setToken(res.token);
+      saveOfflineSession(res.user, res.agency);
       setIsBackendConnected(true);
     } catch (err: any) {
       throw err;
@@ -100,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(res.user);
       setAgency(res.agency);
       setToken(res.token);
+      saveOfflineSession(res.user, res.agency);
       setIsBackendConnected(true);
     } catch (err: any) {
       throw err;
@@ -111,6 +166,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (profileData: { name: string; email: string }) => {
     const res = await api.updateProfile(profileData);
     setUser(res.user);
+    if (agency) {
+      saveOfflineSession(res.user, agency);
+    }
     if (res.token) setToken(res.token);
   };
 
@@ -120,6 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     api.setToken(null);
+    clearOfflineSession();
     setUser(null);
     setAgency(null);
     setToken(null);
