@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Creator, Deal, DealStage, Deliverable, DeliverableStatus, DeliverableType, PlatformType, ContentCategory, PaymentStatusType, CreatorRepresentationType } from '../types/creatorops';
-import { X, Mail, CheckCircle2, UserPlus, Shield, Tag, Camera, Video } from 'lucide-react';
+import { X, Mail, CheckCircle2, UserPlus, Shield, Tag, Camera, Video, Edit3, Check } from 'lucide-react';
 
 const PRESET_COLORS = [
   '#4F46E5', // Indigo Sapphire
@@ -276,7 +276,160 @@ export const AddCreatorModal: React.FC<AddCreatorModalProps> = ({
   );
 };
 
-// 2. Add Deal Modal
+// 2. Edit Rate Card Modal
+interface EditRateCardModalProps {
+  creator: Creator | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onUpdateCreator: (updatedCreator: Creator) => void;
+}
+
+export const EditRateCardModal: React.FC<EditRateCardModalProps> = ({
+  creator,
+  isOpen,
+  onClose,
+  onUpdateCreator
+}) => {
+  const [instaReelRate, setInstaReelRate] = useState<number | ''>(25000);
+  const [youtubeLongVideoRate, setYoutubeLongVideoRate] = useState<number | ''>(80000);
+  const [rateNotes, setRateNotes] = useState('');
+  const [representationType, setRepresentationType] = useState<CreatorRepresentationType>('In-House Exclusive');
+
+  useEffect(() => {
+    if (creator) {
+      setInstaReelRate(creator.instaReelRate || 25000);
+      setYoutubeLongVideoRate(creator.youtubeLongVideoRate || 80000);
+      setRateNotes(creator.rateNotes || '');
+      setRepresentationType(creator.representationType || 'In-House Exclusive');
+    }
+  }, [creator]);
+
+  if (!isOpen || !creator) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateCreator({
+      ...creator,
+      instaReelRate: Number(instaReelRate) || 0,
+      youtubeLongVideoRate: Number(youtubeLongVideoRate) || 0,
+      rateNotes: rateNotes.trim(),
+      representationType
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-surface rounded-xl border border-border shadow-modal max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-150">
+        <div className="p-4 border-b border-border flex items-center justify-between bg-slate-900 text-white">
+          <div className="flex items-center gap-2">
+            <Edit3 className="w-4 h-4 text-accent" />
+            <h3 className="text-sm font-bold text-white">Edit Commercial Rate Card: {creator.name}</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-lg">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="p-3 bg-indigo-50/80 border border-indigo-100 rounded-xl space-y-3">
+            <label className="block text-xs font-extrabold text-indigo-950 flex items-center gap-1.5">
+              <Tag className="w-4 h-4 text-accent" />
+              <span>Update Rate Prices for {creator.name}</span>
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+                  <Camera className="w-3.5 h-3.5 text-pink-600" />
+                  <span>1 Insta Reel (₹)</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={instaReelRate}
+                  onChange={(e) => setInstaReelRate(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full px-3 py-2 bg-white text-ink text-xs font-mono font-bold rounded-lg border border-border focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+                  <Video className="w-3.5 h-3.5 text-red-600" />
+                  <span>1 Long Video (₹)</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={youtubeLongVideoRate}
+                  onChange={(e) => setYoutubeLongVideoRate(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full px-3 py-2 bg-white text-ink text-xs font-mono font-bold rounded-lg border border-border focus:outline-none focus:border-accent"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-ink-muted mb-1">Rate Card Additional Notes</label>
+            <textarea
+              rows={3}
+              value={rateNotes}
+              onChange={(e) => setRateNotes(e.target.value)}
+              placeholder="e.g. YouTube Dedicated: ₹80,000 | 60s Integration: ₹35,000 | Instagram Reel: ₹25,000"
+              className="w-full px-3 py-2 bg-bg text-ink text-xs rounded-lg border border-border focus:outline-none focus:border-accent font-medium"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-indigo-700 mb-1 flex items-center gap-1">
+              <Shield className="w-3.5 h-3.5 text-accent" />
+              <span>Agency Representation Type</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRepresentationType('In-House Exclusive')}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${
+                  representationType === 'In-House Exclusive'
+                    ? 'bg-accent text-white border-accent shadow-subtle'
+                    : 'bg-white text-ink border-border hover:bg-slate-50'
+                }`}
+              >
+                🔒 In-House Exclusive
+              </button>
+              <button
+                type="button"
+                onClick={() => setRepresentationType('Non-Exclusive / Other')}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${
+                  representationType === 'Non-Exclusive / Other'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-subtle'
+                    : 'bg-white text-ink border-border hover:bg-slate-50'
+                }`}
+              >
+                🌐 Non-Exclusive
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-3 flex justify-end gap-2 border-t border-border">
+            <button type="button" onClick={onClose} className="px-3.5 py-2 text-xs font-bold text-ink-muted hover:text-ink">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-accent text-white text-xs font-bold rounded-lg hover:bg-accent-hover transition-all flex items-center gap-1.5 shadow-subtle"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Save Rate Card Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// 3. Add Deal Modal
 interface AddDealModalProps {
   creators: Creator[];
   isOpen: boolean;
@@ -503,7 +656,7 @@ export const AddDealModal: React.FC<AddDealModalProps> = ({
   );
 };
 
-// 3. Add Deliverable Modal
+// 4. Add Deliverable Modal
 interface AddDeliverableModalProps {
   deals: Deal[];
   creators: Creator[];
@@ -745,7 +898,7 @@ export const AddDeliverableModal: React.FC<AddDeliverableModalProps> = ({
   );
 };
 
-// 4. Email Digest Modal
+// 5. Email Digest Modal
 interface EmailDigestModalProps {
   overdueDeliverables: Deliverable[];
   creators: Creator[];

@@ -10,9 +10,11 @@ import {
   Globe,
   Video,
   Camera,
-  Tag
+  Tag,
+  Edit3
 } from 'lucide-react';
 import { formatINR } from '../lib/format';
+import { EditRateCardModal } from './Modals';
 
 interface CreatorRosterProps {
   agency: Agency;
@@ -34,6 +36,7 @@ const PAYMENT_STATUS_COLORS: Record<PaymentStatusType, string> = {
 
 export const CreatorRoster: React.FC<CreatorRosterProps> = ({
   agency,
+  onUpdateCreator,
   onDeleteCreator,
   onOpenInvoiceModal,
   setIsAddModalOpen
@@ -41,6 +44,7 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [representationFilter, setRepresentationFilter] = useState<'all' | CreatorRepresentationType>('all');
   const [, setPrintingCreator] = useState<Creator | null>(null);
+  const [editingRateCardCreator, setEditingRateCardCreator] = useState<Creator | null>(null);
 
   const filteredCreators = agency.creators.filter(c => {
     if (representationFilter !== 'all' && c.representationType !== representationFilter) return false;
@@ -229,14 +233,26 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
                 </div>
               </div>
 
-              {/* COMMERCIAL RATE CARD BOX */}
-              <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-2">
+              {/* COMMERCIAL RATE CARD BOX WITH EDIT BUTTON */}
+              <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-950">
                     <Tag className="w-4 h-4 text-accent" />
                     <span>Official Rate Card</span>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Commercial Deliverable Pricing</span>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                      Commercial Deliverable Pricing
+                    </span>
+                    <button
+                      onClick={() => setEditingRateCardCreator(creator)}
+                      className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-accent border border-indigo-200 text-xs font-extrabold rounded-lg flex items-center gap-1 transition-all shadow-subtle"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>Edit Rate Card</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
@@ -339,6 +355,14 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
           );
         })}
       </div>
+
+      {/* EDIT RATE CARD MODAL */}
+      <EditRateCardModal
+        creator={editingRateCardCreator}
+        isOpen={!!editingRateCardCreator}
+        onClose={() => setEditingRateCardCreator(null)}
+        onUpdateCreator={onUpdateCreator}
+      />
     </div>
   );
 };
