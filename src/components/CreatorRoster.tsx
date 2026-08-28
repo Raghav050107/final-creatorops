@@ -7,7 +7,10 @@ import {
   Receipt,
   Filter,
   Shield,
-  Globe
+  Globe,
+  Video,
+  Instagram,
+  Tag
 } from 'lucide-react';
 import { formatINR } from '../lib/format';
 
@@ -20,14 +23,6 @@ interface CreatorRosterProps {
   isAddModalOpen: boolean;
   setIsAddModalOpen: (open: boolean) => void;
 }
-
-const PAYMENT_STATUS_COLORS: Record<PaymentStatusType, string> = {
-  'Invoice Pending': 'bg-amber-50 text-amber-800 border-amber-200',
-  'Invoice Sent': 'bg-blue-50 text-blue-800 border-blue-200',
-  'Payment Processing': 'bg-purple-50 text-purple-800 border-purple-200',
-  'Paid & Completed': 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  'Overdue': 'bg-red-50 text-red-800 border-red-200'
-};
 
 export const CreatorRoster: React.FC<CreatorRosterProps> = ({
   agency,
@@ -69,9 +64,9 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
       {/* Header & Filter Controls Banner */}
       <div className="bg-surface p-4 rounded-xl border border-border shadow-card flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold text-ink">Creator Roster & Earnings Performance Directory</h3>
+          <h3 className="text-sm font-bold text-ink">Creator Roster & Commercial Rate Cards</h3>
           <p className="text-xs text-ink-muted mt-0.5">
-            Filter in-house exclusive roster talent vs non-exclusive roster, view active deals, commercials, and payment status.
+            View in-house roster talent, commercial rate cards (Insta Reels & Long Videos), active deals, and payout history.
           </p>
         </div>
 
@@ -226,6 +221,47 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
                 </div>
               </div>
 
+              {/* COMMERCIAL RATE CARD BOX */}
+              <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-950">
+                    <Tag className="w-4 h-4 text-accent" />
+                    <span>Official Rate Card</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Commercial Deliverable Pricing</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
+                  {/* 1 Insta Reel Rate Pill */}
+                  <div className="p-2.5 bg-white border border-indigo-200/80 rounded-lg flex items-center gap-2.5 shadow-subtle">
+                    <div className="p-1.5 bg-pink-50 text-pink-600 rounded-md">
+                      <Instagram className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">1 Instagram Reel Rate</p>
+                      <p className="text-xs font-extrabold text-ink font-mono">{formatINR(creator.instaReelRate || 25000)}</p>
+                    </div>
+                  </div>
+
+                  {/* 1 Long Video Rate Pill */}
+                  <div className="p-2.5 bg-white border border-indigo-200/80 rounded-lg flex items-center gap-2.5 shadow-subtle">
+                    <div className="p-1.5 bg-red-50 text-red-600 rounded-md">
+                      <Video className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">1 Long YouTube Video Rate</p>
+                      <p className="text-xs font-extrabold text-ink font-mono">{formatINR(creator.youtubeLongVideoRate || 80000)}</p>
+                    </div>
+                  </div>
+
+                  {/* Additional Notes */}
+                  <div className="p-2.5 bg-white border border-indigo-200/80 rounded-lg sm:col-span-2 md:col-span-1 shadow-subtle">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Rate Card Notes</p>
+                    <p className="text-xs text-ink-muted truncate font-medium">{creator.rateNotes || 'Standard deliverable package rates'}</p>
+                  </div>
+                </div>
+              </div>
+
               {/* DETAILED BRAND DEALS TABLE FOR THIS CREATOR */}
               <div>
                 <h5 className="text-xs font-bold text-ink uppercase tracking-wider mb-2 flex items-center justify-between">
@@ -248,60 +284,40 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
                           <th className="p-3">Stage & Status</th>
                           <th className="p-3 text-right">Gross Commercial</th>
                           <th className="p-3 text-right">Unseen Hours Cut</th>
-                          <th className="p-3 text-right">Net Creator Share</th>
-                          <th className="p-3">Payment Status & Deadline</th>
+                          <th className="p-3 text-right">Net Creator Payout</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border bg-white">
+                      <tbody className="divide-y divide-border">
                         {creatorDeals.map((deal) => {
                           const cutPct = deal.commissionPct + (deal.unseenHoursCutPct || 0);
-                          const unseenCutVal = (deal.value * cutPct) / 100;
-                          const netPayoutVal = deal.value - unseenCutVal;
-                          const statusType: PaymentStatusType = deal.paymentStatus || (deal.stage === 'Paid' ? 'Paid & Completed' : 'Invoice Sent');
+                          const agencyCutVal = (deal.value * cutPct) / 100;
+                          const creatorNetVal = deal.value - agencyCutVal;
+                          const statusStyle = PAYMENT_STATUS_COLORS[deal.paymentStatus || 'Invoice Pending'];
 
                           return (
                             <tr key={deal.id} className="hover:bg-slate-50 transition-colors">
                               <td className="p-3">
-                                <span className="font-bold text-ink block">{deal.brandName}</span>
-                                <span className="text-[10px] text-ink-muted font-mono">
-                                  Target Live: {deal.targetLiveDate || 'TBD'}
-                                </span>
+                                <p className="font-bold text-ink">{deal.brandName}</p>
+                                <p className="text-[10px] text-slate-400">{deal.brandContact}</p>
                               </td>
-
                               <td className="p-3">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                  deal.stage === 'Paid' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                                  deal.stage === 'In Progress' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
-                                  'bg-slate-100 text-slate-700 border-slate-200'
-                                }`}>
-                                  {deal.stage}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-2 py-0.5 bg-slate-100 font-bold text-slate-700 text-[10px] rounded">
+                                    {deal.stage}
+                                  </span>
+                                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${statusStyle}`}>
+                                    {deal.paymentStatus || 'Invoice Pending'}
+                                  </span>
+                                </div>
                               </td>
-
-                              <td className="p-3 text-right font-mono font-bold text-ink tabular-nums">
+                              <td className="p-3 text-right font-mono font-bold text-ink">
                                 {formatINR(deal.value)}
                               </td>
-
-                              <td className="p-3 text-right font-mono font-bold text-amber-700 tabular-nums">
-                                <span className="bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                                  {cutPct}% (-{formatINR(unseenCutVal)})
-                                </span>
+                              <td className="p-3 text-right font-mono text-slate-500">
+                                {formatINR(agencyCutVal)} <span className="text-[10px]">({cutPct}%)</span>
                               </td>
-
-                              <td className="p-3 text-right font-mono font-extrabold text-emerald-700 text-sm tabular-nums">
-                                {formatINR(netPayoutVal)}
-                              </td>
-
-                              <td className="p-3">
-                                <div className="space-y-1">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block ${PAYMENT_STATUS_COLORS[statusType]}`}>
-                                    {statusType}
-                                  </span>
-                                  <div className="text-[10px] text-slate-500 font-mono">
-                                    {deal.invoiceSentDate && <div>Invoice: {deal.invoiceSentDate}</div>}
-                                    {deal.paymentDueDate && <div className="font-semibold text-slate-700">Due: {deal.paymentDueDate}</div>}
-                                  </div>
-                                </div>
+                              <td className="p-3 text-right font-mono font-bold text-emerald-600">
+                                {formatINR(creatorNetVal)}
                               </td>
                             </tr>
                           );
@@ -315,55 +331,6 @@ export const CreatorRoster: React.FC<CreatorRosterProps> = ({
           );
         })}
       </div>
-
-      {/* PRINTABLE CREATOR STATEMENT OVERLAY */}
-      {printingCreator && (
-        <div className="fixed inset-0 bg-white z-[100] p-8 text-slate-900 font-sans print:block hidden">
-          <div className="border-b-2 border-slate-900 pb-4 mb-6 flex justify-between items-start">
-            <div>
-              <h1 className="text-xl font-extrabold">{agency.name} — Talent Performance & Commercials Statement</h1>
-              <p className="text-xs text-slate-600">Roster Creator: <strong className="text-slate-900">{printingCreator.name}</strong> ({printingCreator.representationType || 'In-House Exclusive'})</p>
-              <p className="text-xs text-slate-500">Statement Date: {new Date().toLocaleDateString()}</p>
-            </div>
-            <img src={printingCreator.photoUrl} alt={printingCreator.name} className="w-12 h-12 rounded-full border object-cover" />
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider">Campaign Commercials & Payment Status Log</h3>
-            <table className="w-full text-left text-xs border border-slate-300">
-              <thead className="bg-slate-100 font-bold uppercase text-[10px]">
-                <tr>
-                  <th className="p-2 border">Brand Deal</th>
-                  <th className="p-2 border">Stage</th>
-                  <th className="p-2 border text-right">Gross Commercial</th>
-                  <th className="p-2 border text-right">Unseen Hours Cut</th>
-                  <th className="p-2 border text-right">Net Creator Share</th>
-                  <th className="p-2 border">Payment Status & Deadline</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getCreatorDeals(printingCreator.id).map(d => {
-                  const cut = (d.value * (d.commissionPct + (d.unseenHoursCutPct || 0))) / 100;
-                  const net = d.value - cut;
-                  return (
-                    <tr key={d.id}>
-                      <td className="p-2 border font-bold">{d.brandName}</td>
-                      <td className="p-2 border">{d.stage}</td>
-                      <td className="p-2 border text-right font-mono">{formatINR(d.value)}</td>
-                      <td className="p-2 border text-right font-mono text-amber-700">-{formatINR(cut)}</td>
-                      <td className="p-2 border text-right font-mono font-bold text-emerald-700">{formatINR(net)}</td>
-                      <td className="p-2 border">
-                        <div>{d.paymentStatus || 'Invoice Sent'}</div>
-                        <div className="text-[10px] text-slate-500">Due: {d.paymentDueDate || 'Net 30'}</div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

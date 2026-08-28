@@ -77,6 +77,8 @@ export interface Creator {
     twitch?: string;
     linkedin?: string;
   };
+  instaReelRate?: number;
+  youtubeLongVideoRate?: number;
   rateNotes: string;
   representationType?: CreatorRepresentationType;
   createdAt: string;

@@ -1,6 +1,6 @@
 import type { Agency } from '../types/creatorops';
 
-const STORAGE_KEY = 'creatorops_agency_data_permanent_v2';
+const STORAGE_KEY = 'creatorops_agency_data_permanent_v3';
 
 export const INITIAL_AGENCY: Agency = {
   id: 'agency_unseen_hours_1',
@@ -36,6 +36,8 @@ export const INITIAL_AGENCY: Agency = {
         instagram: '@markaroni_official',
         tiktok: '@markaroni_tok'
       },
+      instaReelRate: 25000,
+      youtubeLongVideoRate: 80000,
       rateNotes: 'YouTube Dedicated: ₹80,000 | 60s Integration: ₹35,000 | Instagram Reel: ₹25,000',
       representationType: 'In-House Exclusive',
       createdAt: '2026-01-15T09:00:00Z'
@@ -52,6 +54,8 @@ export const INITIAL_AGENCY: Agency = {
         x: '@OneMUFC_News',
         twitch: 'onemufc_live'
       },
+      instaReelRate: 20000,
+      youtubeLongVideoRate: 60000,
       rateNotes: 'Football Matchday Vlog: ₹60,000 | Live Stream Sponsor: ₹30,000 | X Post Thread: ₹12,000',
       representationType: 'In-House Exclusive',
       createdAt: '2026-01-20T11:00:00Z'
@@ -68,6 +72,8 @@ export const INITIAL_AGENCY: Agency = {
         instagram: '@divyansh_cr7',
         x: '@divyanshCR7'
       },
+      instaReelRate: 22000,
+      youtubeLongVideoRate: 50000,
       rateNotes: 'Gaming/Sports Dedicated: ₹50,000 | Reel/Short: ₹22,000 | Brand Post: ₹10,000',
       representationType: 'Non-Exclusive / Other',
       createdAt: '2026-02-10T14:30:00Z'
@@ -149,10 +155,8 @@ export const loadAgencyData = (): Agency => {
     const data = JSON.parse(raw) as Agency;
     if (!data || !data.creators || !data.deals) return INITIAL_AGENCY;
 
-    // Ensure deliverables array exists (even if empty)
     if (!data.deliverables) data.deliverables = [];
 
-    // Ensure notesList array exists for each deal
     if (data.deals && Array.isArray(data.deals)) {
       data.deals = data.deals.map((d: any) => {
         if (!d.notesList) d.notesList = [];
