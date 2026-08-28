@@ -1,6 +1,6 @@
 import type { Agency } from '../types/creatorops';
 
-const STORAGE_KEY = 'creatorops_agency_data_permanent_v3';
+const STORAGE_KEY = 'creatorops_agency_data_permanent_v4';
 
 export const INITIAL_AGENCY: Agency = {
   id: 'agency_unseen_hours_1',
@@ -79,71 +79,7 @@ export const INITIAL_AGENCY: Agency = {
       createdAt: '2026-02-10T14:30:00Z'
     }
   ],
-  deals: [
-    {
-      id: 'deal_101',
-      agencyId: 'agency_unseen_hours_1',
-      brandName: 'NordVPN',
-      brandContact: 'clara@nordvpn.com',
-      value: 145000,
-      currency: 'INR',
-      commissionPct: 15,
-      unseenHoursCutPct: 15,
-      stage: 'In Progress',
-      targetLiveDate: '2026-07-28',
-      invoiceSentDate: '2026-07-25',
-      paymentDueDate: '2026-08-10',
-      paymentStatus: 'Invoice Sent',
-      creatorIds: ['c_markaroni', 'c_divyanshcr7'],
-      notesList: [],
-      activityLog: [
-        { id: 'act_1', date: '2026-07-20', author: 'Jordan Miller', text: 'Campaign contract signed across Markaroni & DivyanshCR7.' }
-      ],
-      createdAt: '2026-07-15T10:00:00Z'
-    },
-    {
-      id: 'deal_102',
-      agencyId: 'agency_unseen_hours_1',
-      brandName: 'EA Sports FC 25',
-      brandContact: 'creators@ea.com',
-      value: 180000,
-      currency: 'INR',
-      commissionPct: 18,
-      unseenHoursCutPct: 18,
-      stage: 'Signed',
-      targetLiveDate: '2026-08-02',
-      invoiceSentDate: '2026-07-27',
-      paymentDueDate: '2026-08-15',
-      paymentStatus: 'Invoice Pending',
-      creatorIds: ['c_onemufc', 'c_divyanshcr7'],
-      notesList: [],
-      activityLog: [
-        { id: 'act_3', date: '2026-07-24', author: 'Jordan Miller', text: 'Launch campaign locked for FC25 Ultimate Team gameplay integrations.' }
-      ],
-      createdAt: '2026-07-22T11:20:00Z'
-    },
-    {
-      id: 'deal_103',
-      agencyId: 'agency_unseen_hours_1',
-      brandName: 'Raycast Pro',
-      brandContact: 'partnerships@raycast.com',
-      value: 65000,
-      currency: 'INR',
-      commissionPct: 15,
-      unseenHoursCutPct: 15,
-      stage: 'Delivered',
-      targetLiveDate: '2026-07-15',
-      invoiceSentDate: '2026-07-16',
-      paymentDueDate: '2026-07-30',
-      paymentStatus: 'Payment Processing',
-      creatorIds: ['c_markaroni'],
-      notesList: [],
-      activityLog: [
-        { id: 'act_4', date: '2026-07-16', author: 'Sam Chen', text: 'Deliverable completed and metrics syncing enabled.' }
-      ],
-      createdAt: '2026-07-01T15:45:00Z'
-    }
-  ],
+  deals: [],
   deliverables: [],
   reports: []
 };
@@ -153,9 +89,24 @@ export const loadAgencyData = (): Agency => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return INITIAL_AGENCY;
     const data = JSON.parse(raw) as Agency;
-    if (!data || !data.creators || !data.deals) return INITIAL_AGENCY;
+    if (!data) return INITIAL_AGENCY;
 
-    if (!data.deliverables) data.deliverables = [];
+    // PRESERVE USER DELETIONS! Only fallback if property is NOT an array!
+    if (!Array.isArray(data.managers)) {
+      data.managers = INITIAL_AGENCY.managers;
+    }
+    if (!Array.isArray(data.creators)) {
+      data.creators = INITIAL_AGENCY.creators;
+    }
+    if (!Array.isArray(data.deals)) {
+      data.deals = [];
+    }
+    if (!Array.isArray(data.deliverables)) {
+      data.deliverables = [];
+    }
+    if (!Array.isArray(data.reports)) {
+      data.reports = [];
+    }
 
     if (data.deals && Array.isArray(data.deals)) {
       data.deals = data.deals.map((d: any) => {
