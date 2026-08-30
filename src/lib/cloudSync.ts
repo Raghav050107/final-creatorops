@@ -3,10 +3,6 @@ import { saveAgencyData } from './store';
 
 const NETLIFY_SYNC_API = '/.netlify/functions/sync';
 
-export function hashAccountEmail(email: string): string {
-  return 'acct_' + email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-}
-
 export function generateSyncCode(): string {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   let num = '';
@@ -16,22 +12,50 @@ export function generateSyncCode(): string {
   return 'UH-' + num;
 }
 
-export class CloudSyncEngine {
-  private static activeVaultUuid: string | null = localStorage.getItem('creatorops_cloud_vault_uuid');
-  private static activeSyncCode: string | null = localStorage.getItem('creatorops_cloud_sync_code');
-
-  public static getVaultUuid(): string | null {
-    return this.activeVaultUuid || localStorage.getItem('creatorops_cloud_vault_uuid');
+export function encodeWorkspaceToToken(user: any, agency: Agency): string {
+  try {
+    const payload = {
+      user: user ? { name: user.name, email: user.email, role: user.role, agencyId: user.agencyId } : null,
+      agency: {
+        id: agency.id,
+        name: agency.name,
+        creators: agency.creators || [],
+        deals: agency.deals || [],
+        deliverables: agency.deliverables || [],
+        managers: agency.managers || []
+      },
+      createdAt: new Date().toISOString()
+    };
+    const jsonStr = JSON.stringify(payload);
+    return btoa(unescape(encodeURIComponent(jsonStr)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  } catch (err) {
+    console.warn('Encoding sync token failed:', err);
+    return '';
   }
+}
 
-  public static setVaultUuid(uuid: string | null) {
-    this.activeVaultUuid = uuid;
-    if (uuid) {
-      localStorage.setItem('creatorops_cloud_vault_uuid', uuid);
-    } else {
-      localStorage.removeItem('creatorops_cloud_vault_uuid');
+export function decodeTokenToWorkspace(token: string): { agency: Agency; user?: any } | null {
+  try {
+    let cleanToken = token.trim().replace(/-/g, '+').replace(/_/g, '/');
+    while (cleanToken.length % 4 !== 0) {
+      cleanToken += '=';
     }
+    const jsonStr = decodeURIComponent(escape(atob(cleanToken)));
+    const parsed = JSON.parse(jsonStr);
+    if (parsed && parsed.agency) {
+      return parsed;
+    }
+  } catch (err) {
+    console.warn('Decoding sync token failed:', err);
   }
+  return null;
+}
+
+export class CloudSyncEngine {
+  private static activeSyncCode: string | null = localStorage.getItem('creatorops_cloud_sync_code');
 
   public static getSyncCode(): string {
     if (!this.activeSyncCode) {
@@ -53,7 +77,20 @@ export class CloudSyncEngine {
     localStorage.setItem('creatorops_cloud_sync_code', clean);
   }
 
-  // 1. Fetch Cloud Vault mapping for an account email
+  public static setVaultUuid(uuid: string | null) {
+    if (uuid) {
+      localStorage.setItem('creatorops_cloud_vault_uuid', uuid);
+    } else {
+      localStorage.removeItem('creatorops_cloud_vault_uuid');
+    }
+  }
+
+  public static getOneClickSyncUrl(user: any, agency: Agency): string {
+    const token = encodeWorkspaceToToken(user, agency);
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?syncToken=${token}`;
+  }
+
   public static async findVaultForAccount(email: string): Promise<any | null> {
     const cleanEmail = email.trim().toLowerCase();
     try {
@@ -69,42 +106,37 @@ export class CloudSyncEngine {
     return null;
   }
 
-  // 2. Pair Device using 6-Digit Sync Code (e.g. UH-8492)
-  public static async pairDeviceWithSyncCode(code: string): Promise<{ agency: Agency; user?: any } | null> {
-    const cleanCode = code.trim().toUpperCase();
-    try {
-      const res = await fetch(`${NETLIFY_SYNC_API}?code=${encodeURIComponent(cleanCode)}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-
-      if (data && data.vault && data.vault.agency) {
-        this.setSyncCode(cleanCode);
-        saveAgencyData(data.vault.agency);
-        return data.vault;
-      }
-    } catch (err) {
-      console.warn('Pairing lookup error:', err);
-    }
-    return null;
-  }
-
-  // 3. Fetch full Agency Workspace JSON from Cloud Vault
   public static async pullWorkspace(vaultUuid: string): Promise<{ agency: Agency; user?: any } | null> {
+    return this.pairDeviceWithSyncCode(vaultUuid);
+  }
+
+  public static async pairDeviceWithSyncCode(input: string): Promise<{ agency: Agency; user?: any } | null> {
+    const cleanInput = input.trim();
+
+    // 1. Try decoding directly as Sync Token
+    const decoded = decodeTokenToWorkspace(cleanInput);
+    if (decoded && decoded.agency) {
+      saveAgencyData(decoded.agency);
+      return decoded;
+    }
+
+    // 2. Try Netlify Functions Serverless Endpoint
     try {
-      const res = await fetch(`${NETLIFY_SYNC_API}?code=${encodeURIComponent(vaultUuid)}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data && data.vault && data.vault.agency) {
-        saveAgencyData(data.vault.agency);
-        return data.vault;
+      const res = await fetch(`${NETLIFY_SYNC_API}?code=${encodeURIComponent(cleanInput.toUpperCase())}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.vault && data.vault.agency) {
+          saveAgencyData(data.vault.agency);
+          return data.vault;
+        }
       }
     } catch (err) {
-      console.warn('Cloud Vault pull offline:', err);
+      console.warn('Netlify sync API pairing error:', err);
     }
+
     return null;
   }
 
-  // 4. Create or Push Agency Workspace JSON to Cloud Vault
   public static async pushWorkspace(email: string, user: any, agency: Agency): Promise<string | null> {
     const cleanEmail = email.trim().toLowerCase();
     const syncCode = this.getSyncCode();
@@ -123,11 +155,10 @@ export class CloudSyncEngine {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
-      return syncCode;
     } catch (err) {
-      console.warn('Cloud Vault push failed:', err);
-      return syncCode;
+      console.warn('Netlify sync push note:', err);
     }
+
+    return syncCode;
   }
 }

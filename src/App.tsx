@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Agency, Creator, Deal, Deliverable, DealStage, DeliverableStatus, Manager } from './types/creatorops';
 import { loadAgencyData, saveAgencyData } from './lib/store';
 import { api } from './lib/api';
-import { CloudSyncEngine } from './lib/cloudSync';
+import { CloudSyncEngine, decodeTokenToWorkspace } from './lib/cloudSync';
 import { useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -54,6 +54,23 @@ export const App: React.FC = () => {
   const [selectedInvoiceCreatorId, setSelectedInvoiceCreatorId] = useState<string>('');
   const [selectedInvoiceDealId, setSelectedInvoiceDealId] = useState<string | undefined>();
 
+  // Auto-detect 1-Click Sync Link URL parameter (e.g. ?syncToken=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('syncToken');
+    if (token) {
+      const decoded = decodeTokenToWorkspace(token);
+      if (decoded && decoded.agency) {
+        setAgency(decoded.agency);
+        saveAgencyData(decoded.agency);
+        if (decoded.agency.managers && decoded.agency.managers.length > 0) {
+          setActiveManager(decoded.agency.managers[0]);
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, []);
+
   // Sync with Backend or Cloud Vault on mount or when user changes
   const fetchLiveWorkspace = async () => {
     if (!user) return;
@@ -73,14 +90,11 @@ export const App: React.FC = () => {
 
     // 2. Try Cross-Device Cloud Sync Engine
     try {
-      const vaultId = await CloudSyncEngine.findVaultForAccount(user.email);
-      if (vaultId) {
-        const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
-        if (cloudData && cloudData.agency) {
-          setAgency(cloudData.agency);
-          if (cloudData.agency.managers && cloudData.agency.managers.length > 0) {
-            setActiveManager(cloudData.agency.managers[0]);
-          }
+      const vaultData = await CloudSyncEngine.findVaultForAccount(user.email);
+      if (vaultData && vaultData.agency) {
+        setAgency(vaultData.agency);
+        if (vaultData.agency.managers && vaultData.agency.managers.length > 0) {
+          setActiveManager(vaultData.agency.managers[0]);
         }
       }
     } catch (err) {
