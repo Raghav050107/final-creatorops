@@ -22,6 +22,7 @@ import { CreatorInvoiceModal } from './components/CreatorInvoiceModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthPage } from './components/AuthPage';
 import { AccountSettingsModal } from './components/AccountSettingsModal';
+import { SyncModal } from './components/SyncModal';
 
 export const App: React.FC = () => {
   const { user, agency: authAgency, isLoading } = useAuth();
@@ -49,6 +50,7 @@ export const App: React.FC = () => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [selectedInvoiceCreatorId, setSelectedInvoiceCreatorId] = useState<string>('');
   const [selectedInvoiceDealId, setSelectedInvoiceDealId] = useState<string | undefined>();
 
@@ -463,6 +465,7 @@ export const App: React.FC = () => {
           openAccountSettingsModal={() => setIsAccountSettingsModalOpen(true)}
           openMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           openEmailDigestModal={() => setIsEmailDigestModalOpen(true)}
+          openSyncModal={() => setIsSyncModalOpen(true)}
           overdueCount={overdueCount}
         />
 
@@ -598,6 +601,12 @@ export const App: React.FC = () => {
         isOpen={isAccountSettingsModalOpen}
         onClose={() => setIsAccountSettingsModalOpen(false)}
         managers={agency.managers}
+        onRefreshWorkspace={fetchLiveWorkspace}
+      />
+
+      <SyncModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
         onRefreshWorkspace={fetchLiveWorkspace}
       />
     </div>

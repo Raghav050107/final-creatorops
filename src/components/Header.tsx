@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Manager } from '../types/creatorops';
-import { Mail, Search, LogIn, ShieldCheck, LogOut, KeyRound, Menu } from 'lucide-react';
+import { Mail, Search, LogOut, KeyRound, Menu, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
@@ -12,6 +12,7 @@ interface HeaderProps {
   openAuthModal?: () => void;
   openAccountSettingsModal?: () => void;
   openMobileSidebar?: () => void;
+  openSyncModal?: () => void;
   overdueCount: number;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -23,10 +24,9 @@ export const Header: React.FC<HeaderProps> = ({
   activeManager,
   setActiveManager,
   openEmailDigestModal,
-  openAuthModal,
   openAccountSettingsModal,
   openMobileSidebar,
-  overdueCount,
+  openSyncModal,
   searchQuery,
   setSearchQuery
 }) => {
@@ -46,48 +46,46 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="h-16 bg-surface border-b border-border px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20 shadow-subtle">
-      {/* Title & Mobile Toggle */}
-      <div className="flex items-center gap-2.5 sm:gap-3">
+    <header className="bg-white border-b border-border px-4 sm:px-6 py-3 flex items-center justify-between shadow-subtle shrink-0 font-sans z-30">
+      {/* Mobile Hamburger Button */}
+      <div className="flex items-center gap-2">
         {openMobileSidebar && (
           <button
             onClick={openMobileSidebar}
-            className="md:hidden p-1.5 text-ink-muted hover:text-ink bg-bg border border-border rounded-lg"
+            className="md:hidden p-1.5 text-ink-muted hover:text-ink hover:bg-slate-100 rounded-lg transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
-
-        <h2 className="text-sm sm:text-base font-bold text-ink tracking-tight truncate max-w-[140px] sm:max-w-none">{title}</h2>
-        
-        {/* Cloud Status Pill */}
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>{agency ? agency.name : 'Unseen Hours'}</span>
-        </div>
-
-        {overdueCount > 0 && (
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold bg-warn-bg text-warn px-2.5 py-0.5 rounded-full border border-warn-border">
-            <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse" />
-            {overdueCount} {overdueCount === 1 ? 'overdue' : 'overdue'}
-          </span>
-        )}
+        <h2 className="text-sm sm:text-base font-bold text-ink truncate max-w-[140px] sm:max-w-xs">{title}</h2>
       </div>
 
-      {/* Center Search */}
-      <div className="relative w-36 sm:w-64 md:w-72">
-        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* Center Search Input */}
+      <div className="flex-1 max-w-md mx-2 sm:mx-6 relative hidden sm:block">
+        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search..."
+          placeholder="Search creators, brand deals, status..."
           className="w-full pl-8 sm:pl-9 pr-3 py-1.5 bg-bg text-ink text-xs rounded-md border border-border focus:outline-none focus:border-accent focus:bg-white transition-all placeholder:text-slate-400"
         />
       </div>
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Device Sync Button */}
+        {openSyncModal && (
+          <button
+            onClick={openSyncModal}
+            className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 px-2.5 py-1.5 rounded-lg transition-all shadow-subtle"
+            title="Link computer and phone via 6-digit sync code"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="hidden sm:inline">Sync Devices</span>
+          </button>
+        )}
+
         {/* Email Digest Button */}
         <button
           onClick={openEmailDigestModal}
@@ -95,20 +93,8 @@ export const Header: React.FC<HeaderProps> = ({
           title="Send daily digest email of overdue items"
         >
           <Mail className="w-3.5 h-3.5 text-accent" />
-          <span>Email Digest</span>
+          <span className="hidden md:inline">Email Digest</span>
         </button>
-
-        {/* Switch Agency / Login Button */}
-        {openAuthModal && (
-          <button
-            onClick={openAuthModal}
-            className="hidden md:flex items-center gap-1.5 text-xs font-bold text-accent bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-md transition-colors shadow-subtle"
-            title="Switch agency workspace or sign in"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Switch Workspace</span>
-          </button>
-        )}
 
         {/* Manager User Seat & Dropdown */}
         <div className="flex items-center gap-2 border-l border-border pl-2 sm:pl-3" ref={dropdownRef}>
@@ -118,95 +104,89 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <p className="text-xs font-bold text-ink leading-none">{user ? user.name : activeManager.name}</p>
             <p className="text-[10px] text-accent font-bold leading-tight mt-0.5 uppercase">
-              {user ? user.role : 'Manager'}
+              {user ? user.role : activeManager.role}
             </p>
           </button>
 
-          <div className="relative">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="focus:outline-none block"
-            >
-              <img
-                src={user?.avatarUrl || activeManager.avatarUrl}
-                alt={user?.name || activeManager.name}
-                className="w-8 h-8 rounded-full border-2 border-accent/40 object-cover cursor-pointer hover:ring-2 hover:ring-accent transition-all shadow-subtle"
-              />
-            </button>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="relative focus:outline-none"
+          >
+            <img
+              src={user?.avatarUrl || activeManager.avatarUrl}
+              alt={user?.name || activeManager.name}
+              className="w-8 h-8 rounded-full border-2 border-accent/40 object-cover cursor-pointer hover:ring-2 hover:ring-accent transition-all shadow-subtle"
+            />
+          </button>
 
-            {/* Dropdown Menu with Click-Outside and Sticky Bridge */}
-            {isDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-border rounded-xl shadow-modal p-2.5 z-50 animate-in fade-in zoom-in duration-150">
-                <div className="px-2 py-1 text-[10px] font-extrabold text-ink-muted uppercase border-b border-border/60 pb-1 mb-1.5">
-                  Active Agency Workspace
-                </div>
-                <div className="px-2 py-1.5 bg-slate-50 rounded-lg mb-2 text-xs font-extrabold text-ink flex items-center justify-between">
-                  <span className="truncate">{agency ? agency.name : 'Unseen Hours'}</span>
-                  <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-bold">Cloud</span>
-                </div>
-
-                {/* Account Settings Option */}
-                {openAccountSettingsModal && (
-                  <button
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      openAccountSettingsModal();
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 rounded-lg transition-colors mb-1 text-left"
-                  >
-                    <KeyRound className="w-4 h-4 text-accent shrink-0" />
-                    <span>Account & Workspace Settings</span>
-                  </button>
-                )}
-
-                <div className="px-2 py-1 text-[10px] font-extrabold text-ink-muted uppercase border-t border-border/60 pt-1.5">
-                  Switch Team Seat
-                </div>
-                {managers.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setActiveManager(m);
-                      setIsDropdownOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                      activeManager.id === m.id ? 'bg-accent-light text-accent font-semibold' : 'text-ink hover:bg-slate-50'
-                    }`}
-                  >
-                    <img src={m.avatarUrl} alt={m.name} className="w-5 h-5 rounded-full object-cover shrink-0" />
-                    <span className="truncate">{m.name}</span>
-                  </button>
-                ))}
-
-                <div className="border-t border-border/60 mt-1 pt-1.5 space-y-1">
-                  {openAuthModal && (
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        openAuthModal();
-                      }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-bold text-accent hover:bg-indigo-50 rounded-lg transition-colors text-left"
-                    >
-                      <LogIn className="w-3.5 h-3.5 shrink-0" />
-                      <span>Create / Switch Agency</span>
-                    </button>
-                  )}
-                  {user && (
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        logout();
-                      }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-bold text-warn hover:bg-warn-bg rounded-lg transition-colors text-left"
-                    >
-                      <LogOut className="w-3.5 h-3.5 shrink-0" />
-                      <span>Sign Out</span>
-                    </button>
-                  )}
-                </div>
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-border rounded-xl shadow-modal p-2.5 z-50 animate-in fade-in zoom-in duration-150">
+              <div className="px-2 py-1 text-[10px] font-extrabold text-ink-muted uppercase border-b border-border/60 pb-1 mb-1.5">
+                Active Agency Workspace
               </div>
-            )}
-          </div>
+              <div className="px-2 py-1.5 bg-slate-50 rounded-lg mb-2 text-xs font-extrabold text-ink flex items-center justify-between">
+                <span className="truncate">{agency ? agency.name : 'Unseen Hours'}</span>
+                <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-bold">Cloud Synced</span>
+              </div>
+
+              {openSyncModal && (
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    openSyncModal();
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-2 text-xs font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100/80 rounded-lg transition-colors mb-1 text-left"
+                >
+                  <Smartphone className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Sync Phone / Pair Device</span>
+                </button>
+              )}
+
+              {openAccountSettingsModal && (
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    openAccountSettingsModal();
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 rounded-lg transition-colors mb-1 text-left"
+                >
+                  <KeyRound className="w-4 h-4 text-accent shrink-0" />
+                  <span>Account & Workspace Settings</span>
+                </button>
+              )}
+
+              <div className="px-2 py-1 text-[10px] font-extrabold text-ink-muted uppercase border-t border-border/60 pt-1.5">
+                Switch Team Seat
+              </div>
+              {managers.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setActiveManager(m);
+                    setIsDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                    activeManager.id === m.id ? 'bg-accent-light text-accent font-semibold' : 'text-ink hover:bg-slate-50'
+                  }`}
+                >
+                  <img src={m.avatarUrl} alt={m.name} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                  <span className="truncate">{m.name}</span>
+                </button>
+              ))}
+
+              <button
+                onClick={() => {
+                  setIsDropdownOpen(false);
+                  logout();
+                }}
+                className="w-full flex items-center gap-2 px-2 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors mt-2 border-t border-border/60 pt-2 text-left"
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                <span>Sign Out of Account</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
