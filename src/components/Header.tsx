@@ -45,6 +45,10 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const displayName = user ? user.name : (activeManager?.name || 'Agency Owner');
+  const displayRole = user ? user.role : (activeManager?.role || 'Owner / Director');
+  const displayAvatar = user?.avatarUrl || activeManager?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80';
+
   return (
     <header className="bg-white border-b border-border px-4 sm:px-6 py-3 flex items-center justify-between shadow-subtle shrink-0 font-sans z-30">
       {/* Mobile Hamburger Button */}
@@ -96,32 +100,32 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden md:inline">Email Digest</span>
         </button>
 
-        {/* Manager User Seat & Dropdown */}
-        <div className="flex items-center gap-2 border-l border-border pl-2 sm:pl-3" ref={dropdownRef}>
+        {/* Manager User Seat & Dropdown - MUST BE RELATIVE */}
+        <div className="relative flex items-center gap-2 border-l border-border pl-2 sm:pl-3" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="text-right hidden sm:block focus:outline-none"
+            className="text-right hidden sm:block focus:outline-none cursor-pointer"
           >
-            <p className="text-xs font-bold text-ink leading-none">{user ? user.name : activeManager.name}</p>
+            <p className="text-xs font-bold text-ink leading-none">{displayName}</p>
             <p className="text-[10px] text-accent font-bold leading-tight mt-0.5 uppercase">
-              {user ? user.role : activeManager.role}
+              {displayRole}
             </p>
           </button>
 
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="relative focus:outline-none"
+            className="relative focus:outline-none cursor-pointer"
           >
             <img
-              src={user?.avatarUrl || activeManager.avatarUrl}
-              alt={user?.name || activeManager.name}
+              src={displayAvatar}
+              alt={displayName}
               className="w-8 h-8 rounded-full border-2 border-accent/40 object-cover cursor-pointer hover:ring-2 hover:ring-accent transition-all shadow-subtle"
             />
           </button>
 
           {/* Dropdown Menu */}
           {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-border rounded-xl shadow-modal p-2.5 z-50 animate-in fade-in zoom-in duration-150">
+            <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-border rounded-xl shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in duration-150">
               <div className="px-2 py-1 text-[10px] font-extrabold text-ink-muted uppercase border-b border-border/60 pb-1 mb-1.5">
                 Active Agency Workspace
               </div>
@@ -136,7 +140,7 @@ export const Header: React.FC<HeaderProps> = ({
                     setIsDropdownOpen(false);
                     openSyncModal();
                   }}
-                  className="w-full flex items-center gap-2 px-2 py-2 text-xs font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100/80 rounded-lg transition-colors mb-1 text-left"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 rounded-lg transition-colors mb-1 text-left cursor-pointer"
                 >
                   <Smartphone className="w-4 h-4 text-indigo-600 shrink-0" />
                   <span>Sync Phone / Pair Device</span>
@@ -149,38 +153,42 @@ export const Header: React.FC<HeaderProps> = ({
                     setIsDropdownOpen(false);
                     openAccountSettingsModal();
                   }}
-                  className="w-full flex items-center gap-2 px-2 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 rounded-lg transition-colors mb-1 text-left"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 rounded-lg transition-colors mb-1 text-left cursor-pointer"
                 >
                   <KeyRound className="w-4 h-4 text-accent shrink-0" />
                   <span>Account & Workspace Settings</span>
                 </button>
               )}
 
-              <div className="px-2 py-1 text-[10px] font-extrabold text-ink-muted uppercase border-t border-border/60 pt-1.5">
-                Switch Team Seat
-              </div>
-              {managers.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    setActiveManager(m);
-                    setIsDropdownOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                    activeManager.id === m.id ? 'bg-accent-light text-accent font-semibold' : 'text-ink hover:bg-slate-50'
-                  }`}
-                >
-                  <img src={m.avatarUrl} alt={m.name} className="w-5 h-5 rounded-full object-cover shrink-0" />
-                  <span className="truncate">{m.name}</span>
-                </button>
-              ))}
+              {managers && managers.length > 0 && (
+                <>
+                  <div className="px-2 py-1 text-[10px] font-extrabold text-ink-muted uppercase border-t border-border/60 pt-1.5">
+                    Switch Team Seat
+                  </div>
+                  {managers.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        setActiveManager(m);
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors cursor-pointer ${
+                        activeManager?.id === m.id ? 'bg-accent-light text-accent font-semibold' : 'text-ink hover:bg-slate-50'
+                      }`}
+                    >
+                      <img src={m.avatarUrl} alt={m.name} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                      <span className="truncate">{m.name}</span>
+                    </button>
+                  ))}
+                </>
+              )}
 
               <button
                 onClick={() => {
                   setIsDropdownOpen(false);
                   logout();
                 }}
-                className="w-full flex items-center gap-2 px-2 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors mt-2 border-t border-border/60 pt-2 text-left"
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors mt-2 border-t border-border/60 pt-2 text-left cursor-pointer"
               >
                 <LogOut className="w-4 h-4 shrink-0" />
                 <span>Sign Out of Account</span>
