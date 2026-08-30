@@ -1,7 +1,7 @@
 import type { Agency } from '../types/creatorops';
 import { saveAgencyData } from './store';
 
-const MASTER_VAULT_UUID = '5e449d0c-cd84-4797-89ec-8bfaa07cc12a';
+const NETLIFY_SYNC_API = '/.netlify/functions/sync';
 
 export function hashAccountEmail(email: string): string {
   return 'acct_' + email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -53,35 +53,34 @@ export class CloudSyncEngine {
     localStorage.setItem('creatorops_cloud_sync_code', clean);
   }
 
-  // 1. Fetch Cloud Vault UUID mapping for an account email
-  public static async findVaultForAccount(email: string): Promise<string | null> {
-    const key = hashAccountEmail(email);
+  // 1. Fetch Cloud Vault mapping for an account email
+  public static async findVaultForAccount(email: string): Promise<any | null> {
+    const cleanEmail = email.trim().toLowerCase();
     try {
-      const res = await fetch(`https://webhook.site/${MASTER_VAULT_UUID}`);
+      const res = await fetch(`${NETLIFY_SYNC_API}?email=${encodeURIComponent(cleanEmail)}`);
       if (!res.ok) return null;
-      const master = await res.json();
-      return master.accounts?.[key]?.uuid || null;
+      const data = await res.json();
+      if (data && data.vault) {
+        return data.vault;
+      }
     } catch (err) {
-      console.warn('Cloud Registry lookup offline:', err);
-      return null;
+      console.warn('Cloud Sync API lookup offline:', err);
     }
+    return null;
   }
 
   // 2. Pair Device using 6-Digit Sync Code (e.g. UH-8492)
   public static async pairDeviceWithSyncCode(code: string): Promise<{ agency: Agency; user?: any } | null> {
     const cleanCode = code.trim().toUpperCase();
     try {
-      const res = await fetch(`https://webhook.site/${MASTER_VAULT_UUID}`);
+      const res = await fetch(`${NETLIFY_SYNC_API}?code=${encodeURIComponent(cleanCode)}`);
       if (!res.ok) return null;
-      const master = await res.json();
-      const mappedVault = master.codes?.[cleanCode];
+      const data = await res.json();
 
-      if (mappedVault && mappedVault.uuid) {
-        const workspaceData = await this.pullWorkspace(mappedVault.uuid);
-        if (workspaceData) {
-          this.setSyncCode(cleanCode);
-          return workspaceData;
-        }
+      if (data && data.vault && data.vault.agency) {
+        this.setSyncCode(cleanCode);
+        saveAgencyData(data.vault.agency);
+        return data.vault;
       }
     } catch (err) {
       console.warn('Pairing lookup error:', err);
@@ -92,13 +91,12 @@ export class CloudSyncEngine {
   // 3. Fetch full Agency Workspace JSON from Cloud Vault
   public static async pullWorkspace(vaultUuid: string): Promise<{ agency: Agency; user?: any } | null> {
     try {
-      const res = await fetch(`https://webhook.site/${vaultUuid}`);
+      const res = await fetch(`${NETLIFY_SYNC_API}?code=${encodeURIComponent(vaultUuid)}`);
       if (!res.ok) return null;
-      const vaultData = await res.json();
-      if (vaultData && vaultData.agency) {
-        this.setVaultUuid(vaultUuid);
-        saveAgencyData(vaultData.agency);
-        return vaultData;
+      const data = await res.json();
+      if (data && data.vault && data.vault.agency) {
+        saveAgencyData(data.vault.agency);
+        return data.vault;
       }
     } catch (err) {
       console.warn('Cloud Vault pull offline:', err);
@@ -108,67 +106,28 @@ export class CloudSyncEngine {
 
   // 4. Create or Push Agency Workspace JSON to Cloud Vault
   public static async pushWorkspace(email: string, user: any, agency: Agency): Promise<string | null> {
-    const key = hashAccountEmail(email);
+    const cleanEmail = email.trim().toLowerCase();
     const syncCode = this.getSyncCode();
-    let currentVaultUuid = this.getVaultUuid();
 
     try {
-      if (!currentVaultUuid) {
-        currentVaultUuid = await this.findVaultForAccount(email);
-      }
+      const payload = {
+        email: cleanEmail,
+        user,
+        agency,
+        syncCode,
+        updatedAt: new Date().toISOString()
+      };
 
-      if (!currentVaultUuid) {
-        const tokenRes = await fetch('https://webhook.site/token', { method: 'POST' }).then(r => r.json());
-        if (tokenRes && tokenRes.uuid) {
-          currentVaultUuid = tokenRes.uuid;
-          this.setVaultUuid(currentVaultUuid);
-        }
-      }
+      await fetch(NETLIFY_SYNC_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-      if (currentVaultUuid) {
-        const payload = { email, user, agency, syncCode, updatedAt: new Date().toISOString() };
-        await fetch(`https://webhook.site/token/${currentVaultUuid}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            default_content: JSON.stringify(payload),
-            default_content_type: 'application/json'
-          })
-        });
-
-        // ALWAYS REGISTER EMAIL AND SYNC CODE IN MASTER REGISTRY!
-        try {
-          let masterData: any = {};
-          try {
-            masterData = await fetch(`https://webhook.site/${MASTER_VAULT_UUID}`).then(r => r.json());
-          } catch {}
-
-          const accounts = {
-            ...(masterData.accounts || {}),
-            [key]: { uuid: currentVaultUuid, email, syncCode, updatedAt: new Date().toISOString() }
-          };
-          const codes = {
-            ...(masterData.codes || {}),
-            [syncCode]: { uuid: currentVaultUuid, email, updatedAt: new Date().toISOString() }
-          };
-
-          await fetch(`https://webhook.site/token/${MASTER_VAULT_UUID}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              default_content: JSON.stringify({ ...masterData, accounts, codes }),
-              default_content_type: 'application/json'
-            })
-          });
-        } catch (regErr) {
-          console.warn('Master vault registration note:', regErr);
-        }
-      }
-
-      return currentVaultUuid;
+      return syncCode;
     } catch (err) {
       console.warn('Cloud Vault push failed:', err);
-      return currentVaultUuid;
+      return syncCode;
     }
   }
 }
