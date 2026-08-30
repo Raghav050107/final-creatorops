@@ -5,13 +5,7 @@ const CLOUD_API_BASE = 'https://api.restful-api.dev/objects';
 const MASTER_REGISTRY_ID = 'ff808181a04ccf2d01a05175cce2146b';
 
 export function hashAccountEmail(email: string): string {
-  let hash = 0;
-  const clean = email.trim().toLowerCase();
-  for (let i = 0; i < clean.length; i++) {
-    hash = ((hash << 5) - hash) + clean.charCodeAt(i);
-    hash |= 0;
-  }
-  return 'cops_acct_' + Math.abs(hash).toString(36);
+  return 'cops_acct_' + email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
 export class CloudSyncEngine {
@@ -96,8 +90,12 @@ export class CloudSyncEngine {
         if (createRes && createRes.id) {
           currentVaultId = createRes.id;
           this.setVaultId(currentVaultId);
+        }
+      }
 
-          // Register in Master Registry
+      // ALWAYS ENSURE MASTER REGISTRY CONTAINS KEY -> VAULT ID LINK!
+      if (currentVaultId) {
+        try {
           const regRes = await fetch(`${CLOUD_API_BASE}/${MASTER_REGISTRY_ID}`).then(r => r.json());
           const accounts = {
             ...(regRes.data?.accounts || {}),
@@ -116,8 +114,11 @@ export class CloudSyncEngine {
               data: { accounts }
             })
           });
+        } catch (regErr) {
+          console.warn('Master registry update note:', regErr);
         }
       }
+
       return currentVaultId;
     } catch (err) {
       console.warn('Cloud Vault push failed:', err);
