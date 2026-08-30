@@ -1,11 +1,10 @@
 import type { Agency } from '../types/creatorops';
 import { saveAgencyData } from './store';
 
-const CLOUD_API_BASE = 'https://api.restful-api.dev/objects';
-const MASTER_REGISTRY_ID = 'ff808181a04ccf2d01a05175cce2146b';
+const MASTER_VAULT_UUID = '5e449d0c-cd84-4797-89ec-8bfaa07cc12a';
 
 export function hashAccountEmail(email: string): string {
-  return 'cops_acct_' + email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+  return 'acct_' + email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
 export function generateSyncCode(): string {
@@ -18,19 +17,19 @@ export function generateSyncCode(): string {
 }
 
 export class CloudSyncEngine {
-  private static activeVaultId: string | null = localStorage.getItem('creatorops_cloud_vault_id');
+  private static activeVaultUuid: string | null = localStorage.getItem('creatorops_cloud_vault_uuid');
   private static activeSyncCode: string | null = localStorage.getItem('creatorops_cloud_sync_code');
 
-  public static getVaultId(): string | null {
-    return this.activeVaultId || localStorage.getItem('creatorops_cloud_vault_id');
+  public static getVaultUuid(): string | null {
+    return this.activeVaultUuid || localStorage.getItem('creatorops_cloud_vault_uuid');
   }
 
-  public static setVaultId(id: string | null) {
-    this.activeVaultId = id;
-    if (id) {
-      localStorage.setItem('creatorops_cloud_vault_id', id);
+  public static setVaultUuid(uuid: string | null) {
+    this.activeVaultUuid = uuid;
+    if (uuid) {
+      localStorage.setItem('creatorops_cloud_vault_uuid', uuid);
     } else {
-      localStorage.removeItem('creatorops_cloud_vault_id');
+      localStorage.removeItem('creatorops_cloud_vault_uuid');
     }
   }
 
@@ -54,15 +53,14 @@ export class CloudSyncEngine {
     localStorage.setItem('creatorops_cloud_sync_code', clean);
   }
 
-  // 1. Fetch Cloud Vault ID mapping for an account email
+  // 1. Fetch Cloud Vault UUID mapping for an account email
   public static async findVaultForAccount(email: string): Promise<string | null> {
     const key = hashAccountEmail(email);
     try {
-      const res = await fetch(`${CLOUD_API_BASE}/${MASTER_REGISTRY_ID}`);
+      const res = await fetch(`https://webhook.site/${MASTER_VAULT_UUID}`);
       if (!res.ok) return null;
-      const registry = await res.json();
-      const mapping = registry.data?.accounts?.[key];
-      return mapping?.vaultId || null;
+      const master = await res.json();
+      return master.accounts?.[key]?.uuid || null;
     } catch (err) {
       console.warn('Cloud Registry lookup offline:', err);
       return null;
@@ -73,13 +71,13 @@ export class CloudSyncEngine {
   public static async pairDeviceWithSyncCode(code: string): Promise<{ agency: Agency; user?: any } | null> {
     const cleanCode = code.trim().toUpperCase();
     try {
-      const res = await fetch(`${CLOUD_API_BASE}/${MASTER_REGISTRY_ID}`);
+      const res = await fetch(`https://webhook.site/${MASTER_VAULT_UUID}`);
       if (!res.ok) return null;
-      const registry = await res.json();
-      const mappedVault = registry.data?.codes?.[cleanCode];
+      const master = await res.json();
+      const mappedVault = master.codes?.[cleanCode];
 
-      if (mappedVault && mappedVault.vaultId) {
-        const workspaceData = await this.pullWorkspace(mappedVault.vaultId);
+      if (mappedVault && mappedVault.uuid) {
+        const workspaceData = await this.pullWorkspace(mappedVault.uuid);
         if (workspaceData) {
           this.setSyncCode(cleanCode);
           return workspaceData;
@@ -92,15 +90,15 @@ export class CloudSyncEngine {
   }
 
   // 3. Fetch full Agency Workspace JSON from Cloud Vault
-  public static async pullWorkspace(vaultId: string): Promise<{ agency: Agency; user?: any } | null> {
+  public static async pullWorkspace(vaultUuid: string): Promise<{ agency: Agency; user?: any } | null> {
     try {
-      const res = await fetch(`${CLOUD_API_BASE}/${vaultId}`);
+      const res = await fetch(`https://webhook.site/${vaultUuid}`);
       if (!res.ok) return null;
-      const vault = await res.json();
-      if (vault && vault.data && vault.data.agency) {
-        this.setVaultId(vaultId);
-        saveAgencyData(vault.data.agency);
-        return vault.data;
+      const vaultData = await res.json();
+      if (vaultData && vaultData.agency) {
+        this.setVaultUuid(vaultUuid);
+        saveAgencyData(vaultData.agency);
+        return vaultData;
       }
     } catch (err) {
       console.warn('Cloud Vault pull offline:', err);
@@ -112,79 +110,65 @@ export class CloudSyncEngine {
   public static async pushWorkspace(email: string, user: any, agency: Agency): Promise<string | null> {
     const key = hashAccountEmail(email);
     const syncCode = this.getSyncCode();
-    let currentVaultId = this.getVaultId();
+    let currentVaultUuid = this.getVaultUuid();
 
     try {
-      if (!currentVaultId) {
-        currentVaultId = await this.findVaultForAccount(email);
+      if (!currentVaultUuid) {
+        currentVaultUuid = await this.findVaultForAccount(email);
       }
 
-      if (currentVaultId) {
-        // UPDATE EXISTING VAULT
-        await fetch(`${CLOUD_API_BASE}/${currentVaultId}`, {
+      if (!currentVaultUuid) {
+        const tokenRes = await fetch('https://webhook.site/token', { method: 'POST' }).then(r => r.json());
+        if (tokenRes && tokenRes.uuid) {
+          currentVaultUuid = tokenRes.uuid;
+          this.setVaultUuid(currentVaultUuid);
+        }
+      }
+
+      if (currentVaultUuid) {
+        const payload = { email, user, agency, syncCode, updatedAt: new Date().toISOString() };
+        await fetch(`https://webhook.site/token/${currentVaultUuid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: key,
-            data: { email, user, agency, syncCode, updatedAt: new Date().toISOString() }
+            default_content: JSON.stringify(payload),
+            default_content_type: 'application/json'
           })
         });
-      } else {
-        // CREATE NEW VAULT
-        const createRes = await fetch(CLOUD_API_BASE, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: key,
-            data: { email, user, agency, syncCode, createdAt: new Date().toISOString() }
-          })
-        }).then(r => r.json());
 
-        if (createRes && createRes.id) {
-          currentVaultId = createRes.id;
-          this.setVaultId(currentVaultId);
-        }
-      }
-
-      // ALWAYS REGISTER EMAIL AND SYNC CODE IN MASTER REGISTRY!
-      if (currentVaultId) {
+        // ALWAYS REGISTER EMAIL AND SYNC CODE IN MASTER REGISTRY!
         try {
-          const regRes = await fetch(`${CLOUD_API_BASE}/${MASTER_REGISTRY_ID}`).then(r => r.json());
+          let masterData: any = {};
+          try {
+            masterData = await fetch(`https://webhook.site/${MASTER_VAULT_UUID}`).then(r => r.json());
+          } catch {}
+
           const accounts = {
-            ...(regRes.data?.accounts || {}),
-            [key]: {
-              vaultId: currentVaultId,
-              email,
-              syncCode,
-              updatedAt: new Date().toISOString()
-            }
+            ...(masterData.accounts || {}),
+            [key]: { uuid: currentVaultUuid, email, syncCode, updatedAt: new Date().toISOString() }
           };
           const codes = {
-            ...(regRes.data?.codes || {}),
-            [syncCode]: {
-              vaultId: currentVaultId,
-              email,
-              updatedAt: new Date().toISOString()
-            }
+            ...(masterData.codes || {}),
+            [syncCode]: { uuid: currentVaultUuid, email, updatedAt: new Date().toISOString() }
           };
 
-          await fetch(`${CLOUD_API_BASE}/${MASTER_REGISTRY_ID}`, {
+          await fetch(`https://webhook.site/token/${MASTER_VAULT_UUID}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              name: 'creatorops_master_registry_v1',
-              data: { accounts, codes }
+              default_content: JSON.stringify({ ...masterData, accounts, codes }),
+              default_content_type: 'application/json'
             })
           });
         } catch (regErr) {
-          console.warn('Master registry update note:', regErr);
+          console.warn('Master vault registration note:', regErr);
         }
       }
 
-      return currentVaultId;
+      return currentVaultUuid;
     } catch (err) {
       console.warn('Cloud Vault push failed:', err);
-      return currentVaultId;
+      return currentVaultUuid;
     }
   }
 }

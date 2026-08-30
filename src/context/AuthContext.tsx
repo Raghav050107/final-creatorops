@@ -76,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem(OFFLINE_USER_KEY);
       localStorage.removeItem(OFFLINE_AGENCY_KEY);
-      CloudSyncEngine.setVaultId(null);
+      CloudSyncEngine.setVaultUuid(null);
     } catch (e) {
       console.warn('Could not clear offline session:', e);
     }
@@ -105,9 +105,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAgency(parsedAgency);
 
           // Try pulling latest cloud workspace snapshot on mount
-          const vaultId = await CloudSyncEngine.findVaultForAccount(parsedUser.email);
-          if (vaultId) {
-            const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
+          const vaultUuid = await CloudSyncEngine.findVaultForAccount(parsedUser.email);
+          if (vaultUuid) {
+            const cloudData = await CloudSyncEngine.pullWorkspace(vaultUuid);
             if (cloudData?.user && cloudData?.agency) {
               setUser(cloudData.user);
               setAgency({
@@ -148,9 +148,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let activeAgency = res.agency;
 
       // CROSS-DEVICE CLOUD VAULT SYNC LOOKUP
-      const vaultId = await CloudSyncEngine.findVaultForAccount(cleanEmail);
-      if (vaultId) {
-        const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
+      const vaultUuid = await CloudSyncEngine.findVaultForAccount(cleanEmail);
+      if (vaultUuid) {
+        const cloudData = await CloudSyncEngine.pullWorkspace(vaultUuid);
         if (cloudData?.user) activeUser = cloudData.user;
         if (cloudData?.agency) {
           activeAgency = {
@@ -174,9 +174,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Backend login offline, falling back to Cloud Sync Vault:', err);
 
       // 2. Fallback to Cloud Sync Vault Lookup for static deploys (Netlify)
-      const vaultId = await CloudSyncEngine.findVaultForAccount(cleanEmail);
-      if (vaultId) {
-        const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
+      const vaultUuid = await CloudSyncEngine.findVaultForAccount(cleanEmail);
+      if (vaultUuid) {
+        const cloudData = await CloudSyncEngine.pullWorkspace(vaultUuid);
         if (cloudData && cloudData.user && cloudData.agency) {
           const authUser: AuthUser = cloudData.user;
           const authAgency: AuthAgency = {

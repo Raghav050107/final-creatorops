@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CloudSyncEngine } from '../lib/cloudSync';
+import { useAuth } from '../context/AuthContext';
+import { loadAgencyData } from '../lib/store';
 import { X, Smartphone, Laptop, Check, RefreshCw, AlertCircle, Copy, Link2 } from 'lucide-react';
 
 interface SyncModalProps {
@@ -9,15 +11,28 @@ interface SyncModalProps {
 }
 
 export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onRefreshWorkspace }) => {
+  const { user } = useAuth();
   const [inputCode, setInputCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [isPairing, setIsPairing] = useState(false);
   const [pairingSuccess, setPairingSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
-  if (!isOpen) return null;
+  const [isSyncingLive, setIsSyncingLive] = useState(false);
 
   const currentCode = CloudSyncEngine.getSyncCode();
+
+  // On Modal Open: Immediately Push Workspace & Code to Cloud Master Vault
+  useEffect(() => {
+    if (isOpen) {
+      setIsSyncingLive(true);
+      const email = user?.email || 'admin@unseenhours.com';
+      const agency = loadAgencyData();
+      CloudSyncEngine.pushWorkspace(email, user || { email, name: 'Agency Owner' }, agency)
+        .finally(() => setIsSyncingLive(false));
+    }
+  }, [isOpen, user]);
+
+  if (!isOpen) return null;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(currentCode);
@@ -80,8 +95,9 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onRefresh
               <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
                 <Laptop className="w-4 h-4" /> This Device's Sync Code
               </span>
-              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
-                Live & Active
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                {isSyncingLive && <RefreshCw className="w-3 h-3 animate-spin" />}
+                {isSyncingLive ? 'Syncing...' : 'Live & Active'}
               </span>
             </div>
             <p className="text-xs text-slate-400 mb-3">
@@ -123,7 +139,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onRefresh
                   onChange={(e) => setInputCode(e.target.value.toUpperCase())}
                   placeholder="e.g. UH-8492"
                   maxLength={7}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono tracking-wider text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors uppercase"
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono tracking-wider text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors uppercase font-bold"
                 />
                 <button
                   type="submit"
@@ -137,7 +153,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onRefresh
             </div>
 
             {errorMsg && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2 text-rose-400 text-xs">
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2 text-rose-400 text-xs font-medium">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
