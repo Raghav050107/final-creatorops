@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Agency, Creator, Deal, Deliverable, DealStage, DeliverableStatus, Manager } from './types/creatorops';
 import { loadAgencyData, saveAgencyData } from './lib/store';
 import { api } from './lib/api';
+import { CloudSyncEngine } from './lib/cloudSync';
 import { useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -19,14 +20,22 @@ import {
 } from './components/Modals';
 import { CreatorInvoiceModal } from './components/CreatorInvoiceModal';
 import { AuthModal } from './components/AuthModal';
+import { AuthPage } from './components/AuthPage';
 import { AccountSettingsModal } from './components/AccountSettingsModal';
 
 export const App: React.FC = () => {
-  const { user, agency: authAgency } = useAuth();
+  const { user, agency: authAgency, isLoading } = useAuth();
 
   const [agency, setAgency] = useState<Agency>(() => loadAgencyData());
   const [activeTab, setActiveTab] = useState<any>('deals');
-  const [activeManager, setActiveManager] = useState<Manager>(agency.managers[0]);
+  const [activeManager, setActiveManager] = useState<Manager>(() => agency.managers[0] || {
+    id: 'mgr_jordan',
+    agencyId: 'agency_unseen_hours_1',
+    name: 'Jordan Miller',
+    email: 'admin@unseenhours.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+    role: 'Agency Owner / Talent Director'
+  });
   const [searchQuery, setSearchQuery] = useState('');
 
   // Mobile Drawer State
@@ -43,33 +52,69 @@ export const App: React.FC = () => {
   const [selectedInvoiceCreatorId, setSelectedInvoiceCreatorId] = useState<string>('');
   const [selectedInvoiceDealId, setSelectedInvoiceDealId] = useState<string | undefined>();
 
-  // Modal Presets
-  const [presetDealIdForDeliverable, setPresetDealIdForDeliverable] = useState<string | undefined>();
-  const [presetTargetLiveDate, setPresetTargetLiveDate] = useState<string | undefined>();
-
-  // Sync with Backend on mount or when authAgency changes
+  // Sync with Backend or Cloud Vault on mount or when user changes
   const fetchLiveWorkspace = async () => {
+    if (!user) return;
     try {
+      // 1. Try Backend API first
       const liveData = await api.getAgencyWorkspace();
       if (liveData && liveData.deals) {
         setAgency(liveData);
         if (liveData.managers && liveData.managers.length > 0) {
           setActiveManager(liveData.managers[0]);
         }
+        return;
       }
     } catch (err) {
-      console.warn('Using local cache:', err);
+      console.warn('Backend server offline, checking Cloud Vault sync:', err);
+    }
+
+    // 2. Try Cross-Device Cloud Sync Engine
+    try {
+      const vaultId = await CloudSyncEngine.findVaultForAccount(user.email);
+      if (vaultId) {
+        const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
+        if (cloudData && cloudData.agency) {
+          setAgency(cloudData.agency);
+          if (cloudData.agency.managers && cloudData.agency.managers.length > 0) {
+            setActiveManager(cloudData.agency.managers[0]);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Cloud vault sync check error:', err);
     }
   };
 
   useEffect(() => {
-    fetchLiveWorkspace();
-  }, [authAgency?.id]);
+    if (user) {
+      fetchLiveWorkspace();
+    }
+  }, [authAgency?.id, user]);
 
-  // Auto-save state updates to localStorage
+  // Auto-save state updates to localStorage & Cloud Vault
   useEffect(() => {
-    saveAgencyData(agency);
-  }, [agency]);
+    if (user) {
+      saveAgencyData(agency);
+      CloudSyncEngine.pushWorkspace(user.email, user, agency);
+    }
+  }, [agency, user]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-sans">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-bold tracking-wider uppercase text-slate-300">Loading CreatorOps Workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // REQUIRE AUTHENTICATION! SHOW LOGIN PAGE IF NOT LOGGED IN
+  if (!user) {
+    return <AuthPage />;
+  }
 
   const overdueDeliverables = agency.deliverables.filter(d => {
     if (d.status === 'Live') return false;
@@ -91,7 +136,7 @@ export const App: React.FC = () => {
 
     setAgency(prev => ({
       ...prev,
-      creators: [...prev.creators, creator]
+      creators: [creator, ...prev.creators]
     }));
 
     try {
@@ -125,8 +170,7 @@ export const App: React.FC = () => {
       deals: prev.deals.map(d => ({
         ...d,
         creatorIds: d.creatorIds.filter(id => id !== creatorId)
-      })).filter(d => d.creatorIds.length > 0),
-      deliverables: prev.deliverables.filter(del => del.creatorId !== creatorId)
+      }))
     }));
 
     try {
@@ -141,12 +185,13 @@ export const App: React.FC = () => {
     const deal: Deal = {
       ...newDealData,
       id: tempId,
+      notesList: [],
       activityLog: [
         {
           id: `act_${Date.now()}`,
           date: new Date().toISOString().split('T')[0],
-          author: user?.name || activeManager.name,
-          text: `Deal created for ${newDealData.brandName} at ${newDealData.value} INR`
+          author: user.name,
+          text: `Brand deal for ${newDealData.brandName} added by ${user.name}.`
         }
       ],
       createdAt: new Date().toISOString()
@@ -168,36 +213,23 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSaveDealFromProposal = (dealData: { brandName: string; value: number; commissionPct: number; creatorIds: string[]; targetLiveDate: string }) => {
-    handleSaveDeal({
-      agencyId: agency.id,
-      brandName: dealData.brandName,
-      brandContact: 'proposal@agency.com',
-      value: dealData.value,
-      currency: 'INR',
-      commissionPct: dealData.commissionPct,
-      stage: 'Signed',
-      targetLiveDate: dealData.targetLiveDate,
-      creatorIds: dealData.creatorIds
-    });
-    setActiveTab('deals');
-  };
-
-  const handleUpdateDealStage = async (dealId: string, newStage: DealStage) => {
+  const handleUpdateDealStage = async (dealId: string, stage: DealStage) => {
     setAgency(prev => ({
       ...prev,
       deals: prev.deals.map(d => {
         if (d.id === dealId) {
-          const logItem = {
-            id: `act_${Date.now()}`,
-            date: new Date().toISOString().split('T')[0],
-            author: user?.name || activeManager.name,
-            text: `Stage changed from ${d.stage} to ${newStage}`
-          };
           return {
             ...d,
-            stage: newStage,
-            activityLog: [logItem, ...d.activityLog]
+            stage,
+            activityLog: [
+              {
+                id: `act_${Date.now()}`,
+                date: new Date().toISOString().split('T')[0],
+                author: user.name,
+                text: `Pipeline stage moved to "${stage}".`
+              },
+              ...d.activityLog
+            ]
           };
         }
         return d;
@@ -205,17 +237,10 @@ export const App: React.FC = () => {
     }));
 
     try {
-      await api.updateDeal(dealId, { stage: newStage });
+      await api.updateDeal(dealId, { stage });
     } catch (err) {
       console.warn('Backend sync failed, updated locally:', err);
     }
-  };
-
-  const handleUpdateDealNotes = (dealId: string, notes: string) => {
-    setAgency(prev => ({
-      ...prev,
-      deals: prev.deals.map(d => d.id === dealId ? { ...d, notes } : d)
-    }));
   };
 
   const handleAddDealNote = async (dealId: string, noteText: string) => {
@@ -223,10 +248,9 @@ export const App: React.FC = () => {
     const newNote = {
       id: tempId,
       dealId,
-      agencyId: agency.id,
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      author: user?.name || activeManager.name,
+      author: user.name,
       text: noteText,
+      date: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString()
     };
 
@@ -419,8 +443,8 @@ export const App: React.FC = () => {
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        agencyName={currentAgencyName}
         overdueCount={overdueCount}
+        agencyName={currentAgencyName}
         openAddCreatorModal={() => setIsAddCreatorModalOpen(true)}
         openAddDealModal={() => setIsAddDealModalOpen(true)}
         isOpenMobile={isMobileSidebarOpen}
@@ -433,16 +457,16 @@ export const App: React.FC = () => {
           managers={agency.managers}
           activeManager={activeManager}
           setActiveManager={setActiveManager}
-          openEmailDigestModal={() => setIsEmailDigestModalOpen(true)}
-          openAuthModal={() => setIsAuthModalOpen(true)}
-          openAccountSettingsModal={() => setIsAccountSettingsModalOpen(true)}
-          openMobileSidebar={() => setIsMobileSidebarOpen(true)}
-          overdueCount={overdueCount}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          openAuthModal={() => setIsAuthModalOpen(true)}
+          openAccountSettingsModal={() => setIsAccountSettingsModalOpen(true)}
+          openMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          openEmailDigestModal={() => setIsEmailDigestModalOpen(true)}
+          overdueCount={overdueCount}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50">
           {activeTab === 'dashboard' && (
             <DashboardWidgets
               agency={agency}
@@ -458,60 +482,47 @@ export const App: React.FC = () => {
           {activeTab === 'deals' && (
             <KanbanBoard
               agency={agency}
-              deals={agency.deals}
-              creators={agency.creators}
-              deliverables={agency.deliverables}
+              searchQuery={searchQuery}
               onUpdateDealStage={handleUpdateDealStage}
-              onUpdateDealNotes={handleUpdateDealNotes}
               onAddDealNote={handleAddDealNote}
               onDeleteDealNote={handleDeleteDealNote}
               onAddActivityLog={handleAddActivityLog}
               onDeleteDeal={handleDeleteDeal}
-              onDeleteDeliverable={handleDeleteDeliverable}
               openAddDealModal={() => setIsAddDealModalOpen(true)}
-              openAddDeliverableModal={(dealId) => {
-                setPresetDealIdForDeliverable(dealId);
-                setIsAddDeliverableModalOpen(true);
-              }}
-              onOpenScheduleModal={(dealId) => {
-                setPresetDealIdForDeliverable(dealId);
-                setIsAddDeliverableModalOpen(true);
-              }}
-              onOpenInvoiceModal={(cId, dId) => {
-                setSelectedInvoiceCreatorId(cId);
-                setSelectedInvoiceDealId(dId);
+              onOpenInvoiceModal={(creatorId: string, dealId?: string) => {
+                setSelectedInvoiceCreatorId(creatorId);
+                setSelectedInvoiceDealId(dealId);
                 setIsInvoiceModalOpen(true);
               }}
-              searchQuery={searchQuery}
             />
           )}
 
           {activeTab === 'calendar' && (
             <UnifiedCalendar
               agency={agency}
-              deliverables={agency.deliverables}
-              creators={agency.creators}
-              deals={agency.deals}
               onUpdateDeliverableStatus={handleUpdateDeliverableStatus}
               onUpdateDeliverableDetails={handleUpdateDeliverableDetails}
               onUpdateDeliverableMetrics={handleUpdateDeliverableMetrics}
               onDeleteDeliverable={handleDeleteDeliverable}
-              onOpenScheduleContentModal={(targetLiveDate) => {
-                setPresetTargetLiveDate(targetLiveDate);
-                setIsAddDeliverableModalOpen(true);
-              }}
-              onOpenScheduleModal={(presetDealId, presetDate) => {
-                setPresetDealIdForDeliverable(presetDealId);
-                setPresetTargetLiveDate(presetDate);
-                setIsAddDeliverableModalOpen(true);
-              }}
+              onOpenScheduleModal={() => setIsAddDeliverableModalOpen(true)}
             />
           )}
 
           {activeTab === 'calculator' && (
             <ProposalCalculator
               agency={agency}
-              onSaveDealFromProposal={handleSaveDealFromProposal}
+              onSaveDealFromProposal={(data) => handleSaveDeal({
+                agencyId: agency.id,
+                brandName: data.brandName,
+                brandContact: 'partnerships@brand.com',
+                value: data.value,
+                currency: 'INR',
+                commissionPct: data.commissionPct,
+                unseenHoursCutPct: data.commissionPct,
+                stage: 'Inbound',
+                creatorIds: data.creatorIds,
+                targetLiveDate: data.targetLiveDate
+              })}
             />
           )}
 
@@ -521,8 +532,8 @@ export const App: React.FC = () => {
               onAddCreator={handleSaveCreator}
               onUpdateCreator={handleUpdateCreator}
               onDeleteCreator={handleDeleteCreator}
-              onOpenInvoiceModal={(cId) => {
-                setSelectedInvoiceCreatorId(cId);
+              onOpenInvoiceModal={(creatorId) => {
+                setSelectedInvoiceCreatorId(creatorId);
                 setSelectedInvoiceDealId(undefined);
                 setIsInvoiceModalOpen(true);
               }}
@@ -532,12 +543,14 @@ export const App: React.FC = () => {
           )}
 
           {activeTab === 'revenue' && (
-            <RevenueDashboard agency={agency} />
+            <RevenueDashboard
+              agency={agency}
+            />
           )}
         </main>
       </div>
 
-      {/* Modals */}
+      {/* ALL SYSTEM MODALS */}
       <AddCreatorModal
         agencyId={agency.id}
         isOpen={isAddCreatorModalOpen}
@@ -555,14 +568,8 @@ export const App: React.FC = () => {
       <AddDeliverableModal
         deals={agency.deals}
         creators={agency.creators}
-        presetDealId={presetDealIdForDeliverable}
-        presetTargetLiveDate={presetTargetLiveDate}
         isOpen={isAddDeliverableModalOpen}
-        onClose={() => {
-          setIsAddDeliverableModalOpen(false);
-          setPresetDealIdForDeliverable(undefined);
-          setPresetTargetLiveDate(undefined);
-        }}
+        onClose={() => setIsAddDeliverableModalOpen(false)}
         onSaveDeliverable={handleSaveDeliverable}
       />
 
@@ -575,9 +582,9 @@ export const App: React.FC = () => {
       />
 
       <CreatorInvoiceModal
-        agency={agency}
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}
+        agency={agency}
         initialCreatorId={selectedInvoiceCreatorId}
         initialDealId={selectedInvoiceDealId}
       />

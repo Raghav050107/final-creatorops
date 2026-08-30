@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import { CloudSyncEngine } from '../lib/cloudSync';
+import { loadAgencyData } from '../lib/store';
 
 export interface AuthUser {
   id: string;
@@ -74,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem(OFFLINE_USER_KEY);
       localStorage.removeItem(OFFLINE_AGENCY_KEY);
+      CloudSyncEngine.setVaultId(null);
     } catch (e) {
       console.warn('Could not clear offline session:', e);
     }
@@ -90,37 +93,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsBackendConnected(true);
       }
     } catch (err) {
-      console.warn('Backend server unavailable, preserving active local user session:', err);
-      // PRESERVE REGISTERED OR LOGGED IN OFFLINE USER ON REFRESH!
+      console.warn('Backend server unavailable, checking local & cloud sync user session:', err);
       const savedUserStr = localStorage.getItem(OFFLINE_USER_KEY);
       const savedAgencyStr = localStorage.getItem(OFFLINE_AGENCY_KEY);
 
       if (savedUserStr && savedAgencyStr) {
         try {
-          setUser(JSON.parse(savedUserStr));
-          setAgency(JSON.parse(savedAgencyStr));
+          const parsedUser = JSON.parse(savedUserStr);
+          const parsedAgency = JSON.parse(savedAgencyStr);
+          setUser(parsedUser);
+          setAgency(parsedAgency);
+
+          // Try pulling latest cloud workspace snapshot on mount
+          const vaultId = await CloudSyncEngine.findVaultForAccount(parsedUser.email);
+          if (vaultId) {
+            const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
+            if (cloudData?.user && cloudData?.agency) {
+              setUser(cloudData.user);
+              setAgency({
+                id: cloudData.agency.id,
+                name: cloudData.agency.name,
+                slug: cloudData.agency.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+                currency: 'INR'
+              });
+              saveOfflineSession(cloudData.user, cloudData.agency as any);
+            }
+          }
         } catch {
-          // fallback only if parse fails
+          setUser(null);
+          setAgency(null);
         }
       } else {
-        // Fallback default admin session only on very first launch
-        const defaultUser: AuthUser = {
-          id: 'user_admin_1',
-          name: 'Jordan Miller',
-          email: 'admin@unseenhours.com',
-          role: 'owner',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-          agencyId: 'agency_unseen_hours_1'
-        };
-        const defaultAgency: AuthAgency = {
-          id: 'agency_unseen_hours_1',
-          name: 'Unseen Hours',
-          slug: 'unseen-hours',
-          currency: 'INR'
-        };
-        setUser(defaultUser);
-        setAgency(defaultAgency);
-        saveOfflineSession(defaultUser, defaultAgency);
+        // REQUIRE LOGIN ON FRESH DEVICES!
+        setUser(null);
+        setAgency(null);
       }
     } finally {
       setIsLoading(false);
@@ -133,15 +139,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
-      const res = await api.login(email, password);
-      setUser(res.user);
-      setAgency(res.agency);
+      // 1. Try Backend API login
+      const res = await api.login(cleanEmail, password);
+      let activeUser = res.user;
+      let activeAgency = res.agency;
+
+      // CROSS-DEVICE CLOUD VAULT SYNC LOOKUP
+      const vaultId = await CloudSyncEngine.findVaultForAccount(cleanEmail);
+      if (vaultId) {
+        const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
+        if (cloudData?.user) activeUser = cloudData.user;
+        if (cloudData?.agency) {
+          activeAgency = {
+            id: cloudData.agency.id,
+            name: cloudData.agency.name,
+            slug: cloudData.agency.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            currency: 'INR'
+          };
+        }
+      } else {
+        const currentStore = loadAgencyData();
+        await CloudSyncEngine.pushWorkspace(cleanEmail, activeUser, currentStore);
+      }
+
+      setUser(activeUser);
+      setAgency(activeAgency);
       setToken(res.token);
-      saveOfflineSession(res.user, res.agency);
+      saveOfflineSession(activeUser, activeAgency);
       setIsBackendConnected(true);
     } catch (err: any) {
-      throw err;
+      console.warn('Backend login offline, falling back to Cloud Sync Vault:', err);
+
+      // 2. Fallback to Cloud Sync Vault Lookup for static deploys (Netlify)
+      const vaultId = await CloudSyncEngine.findVaultForAccount(cleanEmail);
+      if (vaultId) {
+        const cloudData = await CloudSyncEngine.pullWorkspace(vaultId);
+        if (cloudData && cloudData.user && cloudData.agency) {
+          const authUser: AuthUser = cloudData.user;
+          const authAgency: AuthAgency = {
+            id: cloudData.agency.id,
+            name: cloudData.agency.name,
+            slug: cloudData.agency.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            currency: 'INR'
+          };
+          setUser(authUser);
+          setAgency(authAgency);
+          saveOfflineSession(authUser, authAgency);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // 3. Fallback for default admin credentials when no vault exists yet
+      if (cleanEmail === 'admin@unseenhours.com' || cleanEmail === 'sam@unseenhours.com') {
+        const demoUser: AuthUser = {
+          id: cleanEmail === 'admin@unseenhours.com' ? 'usr_admin' : 'usr_sam',
+          name: cleanEmail === 'admin@unseenhours.com' ? 'Jordan Miller (Owner)' : 'Sam Wilson (Manager)',
+          email: cleanEmail,
+          role: cleanEmail === 'admin@unseenhours.com' ? 'owner' : 'manager',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+          agencyId: 'agency_unseen_hours_1'
+        };
+        const demoAgency: AuthAgency = {
+          id: 'agency_unseen_hours_1',
+          name: 'Unseen Hours',
+          slug: 'unseen-hours',
+          currency: 'INR'
+        };
+
+        const currentStore = loadAgencyData();
+        await CloudSyncEngine.pushWorkspace(cleanEmail, demoUser, currentStore);
+
+        setUser(demoUser);
+        setAgency(demoAgency);
+        saveOfflineSession(demoUser, demoAgency);
+        setIsLoading(false);
+        return;
+      }
+
+      throw new Error('No account found for this email on any device. Please click "Register" to create a new account.');
     } finally {
       setIsLoading(false);
     }
@@ -149,18 +228,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (agencyName: string, name: string, email: string, password: string) => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    const cleanAgencyName = agencyName.trim();
+
+    const newUser: AuthUser = {
+      id: `usr_${Date.now()}`,
+      name: cleanName,
+      email: cleanEmail,
+      role: 'owner',
+      avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`,
+      agencyId: `agency_${Date.now()}`
+    };
+
+    const newAgency: AuthAgency = {
+      id: newUser.agencyId,
+      name: cleanAgencyName,
+      slug: cleanAgencyName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      currency: 'INR'
+    };
+
     try {
-      const res = await api.register(agencyName, name, email, password);
-      setUser(res.user);
-      setAgency(res.agency);
-      setToken(res.token);
-      saveOfflineSession(res.user, res.agency);
-      setIsBackendConnected(true);
-    } catch (err: any) {
-      throw err;
-    } finally {
-      setIsLoading(false);
+      const res = await api.register(cleanAgencyName, cleanName, cleanEmail, password);
+      if (res && res.user && res.agency) {
+        setUser(res.user);
+        setAgency(res.agency);
+        setToken(res.token);
+        saveOfflineSession(res.user, res.agency);
+        setIsBackendConnected(true);
+      }
+    } catch (err) {
+      console.warn('Backend register offline, creating local + cloud sync account:', err);
+      setUser(newUser);
+      setAgency(newAgency);
+      saveOfflineSession(newUser, newAgency);
     }
+
+    // Push new workspace to Cloud Vault so other devices (phone) can log into it immediately
+    const currentStore = loadAgencyData();
+    currentStore.id = newAgency.id;
+    currentStore.name = cleanAgencyName;
+    await CloudSyncEngine.pushWorkspace(cleanEmail, newUser, currentStore);
+
+    setIsLoading(false);
   };
 
   const updateProfile = async (profileData: { name: string; email: string }) => {
@@ -168,6 +278,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(res.user);
     if (agency) {
       saveOfflineSession(res.user, agency);
+      const currentStore = loadAgencyData();
+      await CloudSyncEngine.pushWorkspace(res.user.email, res.user, currentStore);
     }
     if (res.token) setToken(res.token);
   };
